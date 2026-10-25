@@ -19,18 +19,21 @@ public static class EstateExtensions
         var boardsDatabase = postgres.AddDatabase("boards");
         var canvasDatabase = postgres.AddDatabase("canvas");
 
-        var boardsService = builder
-            .AddProject("boards-service", ProjectPath(repositoryRoot, "MiroClone.BoardsService"))
-            .WithHttpEndpoint(env: "ASPNETCORE_HTTP_PORTS")
-            .WithReference(boardsDatabase)
-            .WaitFor(boardsDatabase)
-            .WithHttpHealthCheck("/health");
-
         var canvasService = builder
             .AddProject("canvas-service", ProjectPath(repositoryRoot, "MiroClone.CanvasService"))
             .WithHttpEndpoint(env: "ASPNETCORE_HTTP_PORTS")
             .WithReference(canvasDatabase)
             .WaitFor(canvasDatabase)
+            .WithHttpHealthCheck("/health");
+
+        // Boards reaches Canvas only to purge a deleted board's snapshot. It does not WaitFor Canvas: the purge is best effort,
+        // and a wait in both directions would be a startup cycle.
+        var boardsService = builder
+            .AddProject("boards-service", ProjectPath(repositoryRoot, "MiroClone.BoardsService"))
+            .WithHttpEndpoint(env: "ASPNETCORE_HTTP_PORTS")
+            .WithReference(boardsDatabase)
+            .WaitFor(boardsDatabase)
+            .WithReference(canvasService)
             .WithHttpHealthCheck("/health");
 
         builder

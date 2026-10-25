@@ -16,7 +16,7 @@ Instructions for coding agents and contributors. `CLAUDE.md` imports this file.
 | `.githooks/` + `scripts/install-hooks.sh` | Pre-commit gitleaks hook (fails closed) | WP00 |
 | `MiroClone.AppHost` | Aspire composition root: PostgreSQL (`boards`, `canvas`), services, web | WP02 |
 | `MiroClone.ServiceDefaults` | Shared kernel (no domain types), ceiling 800 lines (ADR 0005) | WP01 |
-| `MiroClone.BoardsService` | Boards and favourites, PostgreSQL `boards`. Skeleton: `/health`, migrations | WP02 (endpoints WP04) |
+| `MiroClone.BoardsService` | Boards and favourites, PostgreSQL `boards`: `/api/boards`, migrations, canvas purge client | WP04 |
 | `MiroClone.CanvasService` | Canvas aggregate, JSON snapshot, SignalR `/hubs/canvas`. Skeleton: `/health`, migrations | WP02 (aggregate WP05) |
 | `MiroClone.Web` | Blazor Web App, interactive Server; the BFF. Skeleton: `/` renders Hello | WP02 |
 | `tests/` | One xUnit project per service; `Web.Tests` (bUnit); `Web.E2E` (Playwright, WP07+). `AppHost.Tests`, `BoardsService.Tests`, `CanvasService.Tests`, `ServiceDefaults.Tests` (WP01/WP02) | partial |
