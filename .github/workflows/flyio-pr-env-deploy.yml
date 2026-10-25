@@ -1,4 +1,5 @@
-# Ephemeral preview of the estate for each pull request (WP13, pr-preview-environments).
+# DISABLED by owner decision: no Fly.io deployment. Automatic triggers removed; manual dispatch only.
+# Ephemeral preview of the estate for each pull request (WP13, pr-preview-environments). Pull request events no longer run it (ADR 0026).
 # Apps: miroclone-{authservice,canvas,boards,web}-pr-<N>. Shared: the dev PostgreSQL, with one database per service and one
 # login role per PR, created on the fly (scripts/flyio-pr-database.sh). Each preview's authservice has its own RS256 key,
 # generated here and never stored (shared-service-reuse §1). Teardown: flyio-pr-env-destroy.yml, on close.
@@ -6,8 +7,7 @@
 name: flyio-pr-env-deploy
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
 
 permissions:
   contents: read
