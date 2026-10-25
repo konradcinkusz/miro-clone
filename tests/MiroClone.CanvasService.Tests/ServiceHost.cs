@@ -27,10 +27,12 @@ internal static class ServiceHost
         });
         builder.Configuration.AddInMemoryCollection(settings);
         builder.AddServiceDefaults();
+        builder.Services.AddProxyForwardedHeaders();
         builder.Services.AddOriginGuard(builder.Configuration);
         builder.Services.AddCanvasService(builder.Configuration, configureBearer);
 
         var app = builder.Build();
+        app.UseProxyForwardedHeaders();
         app.UseOriginGuard();
         app.UseAuthentication();
         app.UseAuthorization();

@@ -41,12 +41,14 @@ internal static class ServiceHost
         builder.Configuration.AddInMemoryCollection(settings);
 
         builder.AddServiceDefaults();
+        builder.Services.AddProxyForwardedHeaders();
         builder.Services.AddOriginGuard(builder.Configuration);
         builder.Services.AddStandardRateLimiting(builder.Configuration);
         builder.Services.AddBoardsService(builder.Configuration, configureBearer);
         configureServices?.Invoke(builder.Services);
 
         var app = builder.Build();
+        app.UseProxyForwardedHeaders();
         app.UseOriginGuard();
         app.UseAuthentication();
         app.UseRateLimiter();
