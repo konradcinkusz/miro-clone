@@ -29,7 +29,7 @@ jobs:
   destroy:
     name: destroy preview
     # Fork PRs have no secrets, and their preview was never deployed.
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    if: vars.FLYIO_PREVIEWS == 'true' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     environment: dev-fly
     env:

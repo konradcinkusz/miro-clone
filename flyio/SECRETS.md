@@ -37,6 +37,7 @@ Rules for these:
 | Variable | Default | Purpose |
 |---|---|---|
 | `FLY_ORG` | `personal` | Fly organization that owns the apps. |
+| `FLYIO_PREVIEWS` | unset | Set to `true` (repository variable) only after the dev estate is deployed. Turns on the pull-request previews and their teardown. Unset, they are skipped. |
 
 ## Fly app names and where each is set
 

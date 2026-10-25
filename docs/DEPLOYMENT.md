@@ -63,7 +63,7 @@ The first deploy is the first run of every path below, so check each one.
 
 ## Previews
 
-Open a non-draft pull request from a branch of this repository. The preview workflow posts a single comment with the URLs. Closing the pull request
+Previews are off until the repository variable `FLYIO_PREVIEWS` is `true`. Set it after the dev estate's first deploy, because a preview depends on its PostgreSQL app. Then open a non-draft pull request from a branch of this repository. The preview workflow posts a single comment with the URLs. Closing the pull request
 destroys it. To destroy one by hand, run `flyio-pr-env-destroy.yml` with its number. A preview's first request after idle is a cold start,
 which is accepted for previews (ADR 0019).
 

@@ -29,7 +29,9 @@ jobs:
     name: draft guard
     # No environment binding: a draft must not stall on an approval nobody will give (pr-preview-environments §4).
     # Fork PRs get no secrets, so they are not deployed.
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    # Opt-in: previews run only when the repository variable FLYIO_PREVIEWS is 'true' (flyio/SECRETS.md), so a repository
+    # without the dev estate does not fail every pull request.
+    if: github.event.pull_request.head.repo.full_name == github.repository && vars.FLYIO_PREVIEWS == 'true'
     runs-on: ubuntu-latest
     outputs:
       deploy: ${{ steps.check.outputs.deploy }}

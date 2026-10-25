@@ -33,6 +33,7 @@ Each non-draft pull request gets its own copy of the estate. The standard leaves
   `min_machines_running = 0`. The per-PR addresses (`Jwt__PublicBaseUrl`, `Auth__Authority`, `Canvas__BaseUrl`) are passed with `--env`, and the
   images are deployed by `--image` from the head commit.
 - **Draft guard:** a job with no environment binding, so drafts never wait for approval (§4). Fork PRs are skipped, because they have no secrets.
+- **Opt-in:** both preview workflows run only when the repository variable `FLYIO_PREVIEWS` is `true`. The variable is unset until the dev estate exists, so a repository without it does not fail on every pull request.
 - **Concurrency:** one group per PR number, with `cancel-in-progress: false`.
 - **Sticky comment:** one comment per PR, created or updated in place, marked with `<!-- miroclone-pr-env -->`. Teardown rewrites it to "destroyed".
 - **Teardown:** on PR close, the workflow destroys the four apps, drops the databases and the role, and skips anything already gone. The same
