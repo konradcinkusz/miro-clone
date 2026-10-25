@@ -1,0 +1,10 @@
+@* The text alternative every load error renders into (blazor-web-app §5): one role="alert" block, nothing when there is no message. *@
+@if (!string.IsNullOrWhiteSpace(Message))
+{
+    <div class="callout callout-danger" role="alert" data-testid="alert">@Message</div>
+}
+
+@code {
+    [Parameter]
+    public string? Message { get; set; }
+}

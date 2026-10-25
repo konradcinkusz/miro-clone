@@ -1,0 +1,10 @@
+@inject NavigationManager Navigation
+
+@code {
+    /// <summary>
+    /// Sends an unauthenticated visitor to the sign-in page, which is a page outside the interactive router so its forms post
+    /// natively. The full load is deliberate: the sign-in page is served by the server, not the circuit.
+    /// </summary>
+    protected override void OnInitialized() =>
+        Navigation.NavigateTo(MiroClone.Web.Auth.LocalReturnUrl.SignInFor("/" + Navigation.ToBaseRelativePath(Navigation.Uri)), forceLoad: true);
+}

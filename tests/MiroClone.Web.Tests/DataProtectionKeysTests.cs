@@ -15,10 +15,14 @@ public sealed class DataProtectionKeysTests
         try
         {
             var configuration = new ConfigurationBuilder()
-                .AddInMemoryCollection(new Dictionary<string, string?> { ["DataProtection:KeysPath"] = directory })
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["DataProtection:KeysPath"] = directory,
+                    ["Auth:Authority"] = "http://authority.test",
+                })
                 .Build();
             var services = new ServiceCollection();
-            services.AddWebApp(configuration);
+            services.AddWebApp(configuration, new TestSupport.TestEnvironment());
 
             using var provider = services.BuildServiceProvider();
             provider.GetRequiredService<IDataProtectionProvider>().CreateProtector("test").Protect("probe");

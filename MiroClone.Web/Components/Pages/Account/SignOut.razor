@@ -1,0 +1,13 @@
+@page "/sign-out"
+@attribute [ExcludeFromInteractiveRouting]
+
+<PageTitle>Sign out · MiroClone</PageTitle>
+
+<section class="card narrow" aria-labelledby="sign-out-heading">
+    <h1 id="sign-out-heading">Sign out</h1>
+    <p>Signing out ends this session on this device.</p>
+    <form method="post" action="/account/sign-out" class="stack" data-testid="sign-out-form">
+        <AntiforgeryToken />
+        <button class="btn btn-primary" type="submit" data-testid="sign-out-submit">Sign out</button>
+    </form>
+</section>

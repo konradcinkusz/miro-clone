@@ -1,0 +1,57 @@
+@page "/verify-email"
+@attribute [ExcludeFromInteractiveRouting]
+@using MiroClone.Web.Components.Shared
+
+<PageTitle>Verify your email · MiroClone</PageTitle>
+
+<section class="card narrow" aria-labelledby="verify-heading">
+    <h1 id="verify-heading">Verify your email</h1>
+
+    <StatusAlert Message="@Error" />
+    @if (Pending == "1")
+    {
+        <p class="callout callout-success" role="status">
+            If the address needs verifying, a link is on its way. Enter the token from that email below.
+        </p>
+    }
+    @if (Resent == "1")
+    {
+        <p class="callout callout-success" role="status">A new verification link was sent.</p>
+    }
+
+    <form method="post" action="/account/verify-email" class="stack" data-testid="verify-form">
+        <AntiforgeryToken />
+        <div class="field">
+            <label for="verify-email">Email</label>
+            <input id="verify-email" name="email" type="email" autocomplete="email" required maxlength="256" value="@Email" />
+        </div>
+        <div class="field">
+            <label for="verify-token">Verification token</label>
+            <input id="verify-token" name="token" type="text" autocomplete="one-time-code" required value="@Token" />
+        </div>
+        <button class="btn btn-primary" type="submit" data-testid="verify-submit">Verify email</button>
+    </form>
+
+    <form method="post" action="/account/resend-verification" class="stack" data-testid="resend-form">
+        <AntiforgeryToken />
+        <input type="hidden" name="email" value="@Email" />
+        <button class="btn btn-quiet" type="submit" data-testid="resend-submit">Send a new link</button>
+    </form>
+</section>
+
+@code {
+    [SupplyParameterFromQuery(Name = "error")]
+    public string? Error { get; set; }
+
+    [SupplyParameterFromQuery(Name = "email")]
+    public string? Email { get; set; }
+
+    [SupplyParameterFromQuery(Name = "token")]
+    public string? Token { get; set; }
+
+    [SupplyParameterFromQuery(Name = "pending")]
+    public string? Pending { get; set; }
+
+    [SupplyParameterFromQuery(Name = "resent")]
+    public string? Resent { get; set; }
+}

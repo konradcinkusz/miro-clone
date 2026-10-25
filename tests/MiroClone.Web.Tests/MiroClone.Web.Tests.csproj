@@ -14,12 +14,16 @@
 
   <ItemGroup>
     <PackageReference Include="bunit" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit.v3" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\MiroClone.Web\MiroClone.Web.csproj" />
+    <!-- Tests only: the round-trip tests read the services' own record types (blazor-web-app §5, §13). -->
+    <ProjectReference Include="..\..\MiroClone.BoardsService\MiroClone.BoardsService.csproj" />
+    <ProjectReference Include="..\..\MiroClone.CanvasService\MiroClone.CanvasService.csproj" />
   </ItemGroup>
 
 </Project>

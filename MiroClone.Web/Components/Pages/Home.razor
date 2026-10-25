@@ -1,3 +1,119 @@
 @page "/"
+@attribute [Authorize]
+@using MiroClone.Web.Api
+@using MiroClone.Web.Auth
+@using MiroClone.Web.Components.Shared
+@inject ICurrentSession Session
+@inject AuthorityClient Authority
+@inject BoardsClient Boards
+@inject NavigationManager Navigation
 
-<h1>Hello</h1>
+<PageTitle>Boards · MiroClone</PageTitle>
+
+<section class="stack" aria-labelledby="boards-heading">
+    <h1 id="boards-heading">Boards</h1>
+
+    <StatusAlert Message="@error" />
+
+    @if (!loaded)
+    {
+        <p class="muted" role="status" data-testid="dashboard-loading">Loading your workspace…</p>
+    }
+    else
+    {
+        @switch (state?.Kind)
+        {
+            case WorkspaceKind.Active:
+                <p class="muted" data-testid="workspace-name">Workspace: @WorkspaceName()</p>
+                @if (boards is { Items.Count: 0 })
+                {
+                    <div class="empty-state" data-testid="boards-empty">
+                        <h2>No boards yet</h2>
+                        <p>Boards created in this workspace appear here.</p>
+                    </div>
+                }
+                else if (boards is not null)
+                {
+                    <p data-testid="boards-total">@boards.Total boards in this workspace.</p>
+                }
+                break;
+
+            case WorkspaceKind.ChooseOne:
+                <section class="callout callout-warning" data-testid="workspace-choose" aria-labelledby="choose-heading">
+                    <h2 id="choose-heading">Choose a workspace</h2>
+                    <p>
+                        You belong to @(state?.MembershipCount ?? 0) workspaces, and this session has none active. authservice does not yet
+                        issue a token for one organization (ADR 0011), so boards stay closed until it does.
+                    </p>
+                    <ul class="plain-list">
+                        @foreach (var organization in organizations)
+                        {
+                            <li>@organization.Name <span class="muted">(@organization.Role)</span></li>
+                        }
+                    </ul>
+                </section>
+                break;
+
+            case WorkspaceKind.NoWorkspace:
+                <section class="callout callout-warning" data-testid="workspace-none" aria-labelledby="none-heading">
+                    <h2 id="none-heading">No workspace yet</h2>
+                    <p>
+                        Your account does not belong to a workspace. Ask an owner to invite you, or create one in authservice, then sign
+                        in again so your session carries it.
+                    </p>
+                </section>
+                break;
+        }
+    }
+</section>
+
+@code {
+    private WorkspaceState? state;
+    private IReadOnlyList<AuthorityOrganization> organizations = [];
+    private BoardPageDto? boards;
+    private string? error;
+    private bool loaded;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var sessionId = await Session.IdAsync();
+            var principal = await Session.PrincipalAsync();
+            if (sessionId is null || principal is null)
+            {
+                Navigation.NavigateTo(LocalReturnUrl.SignInFor(LocalReturnUrl.Home), forceLoad: true);
+                return;
+            }
+
+            state = WorkspaceState.From(principal);
+
+            var listed = await Authority.ListOrganizationsAsync(sessionId);
+            if (listed.Succeeded)
+            {
+                organizations = listed.Value!;
+            }
+            else
+            {
+                error = listed.Error;
+            }
+
+            if (state.Kind == WorkspaceKind.Active)
+            {
+                boards = await Boards.ListAsync(sessionId, search: null, favouritesOnly: false, page: 1, pageSize: 20);
+            }
+        }
+        catch (HttpRequestException)
+        {
+            error = "Your boards could not be loaded. Try again in a moment.";
+        }
+
+        loaded = true;
+    }
+
+    private string WorkspaceName()
+    {
+        var active = state?.WorkspaceId?.ToString("D");
+        return organizations.FirstOrDefault(org => string.Equals(org.Id, active, StringComparison.OrdinalIgnoreCase))?.Name ?? active ?? string.Empty;
+    }
+}

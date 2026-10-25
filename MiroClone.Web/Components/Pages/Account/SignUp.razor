@@ -1,0 +1,64 @@
+@page "/sign-up"
+@attribute [ExcludeFromInteractiveRouting]
+@using MiroClone.Web.Auth
+@using MiroClone.Web.Components.Shared
+@inject AuthorityClient Authority
+
+<PageTitle>Create an account · MiroClone</PageTitle>
+
+<section class="card narrow" aria-labelledby="sign-up-heading">
+    <h1 id="sign-up-heading">Create an account</h1>
+
+    <StatusAlert Message="@Error" />
+
+    @if (versions is null)
+    {
+        <StatusAlert Message="The sign-up service is not reachable. Try again in a moment." />
+    }
+    else
+    {
+        <form method="post" action="/account/sign-up" class="stack" data-testid="sign-up-form">
+            <AntiforgeryToken />
+            <div class="field">
+                <label for="sign-up-email">Email</label>
+                <input id="sign-up-email" name="email" type="email" autocomplete="email" required maxlength="256" />
+            </div>
+            <div class="field">
+                <label for="sign-up-password">Password</label>
+                <input id="sign-up-password" name="password" type="password" autocomplete="new-password" required minlength="8" maxlength="100" aria-describedby="sign-up-password-hint" />
+                <span id="sign-up-password-hint" class="muted">At least 8 characters.</span>
+            </div>
+            <div class="field field-check">
+                <input id="sign-up-terms" name="terms" type="checkbox" required />
+                <label for="sign-up-terms">I accept the Terms of Use (version @versions.Terms).</label>
+            </div>
+            <div class="field field-check">
+                <input id="sign-up-privacy" name="privacy" type="checkbox" required />
+                <label for="sign-up-privacy">I accept the Privacy Policy (version @versions.Privacy).</label>
+            </div>
+            <button class="btn btn-primary" type="submit" data-testid="sign-up-submit">Create account</button>
+        </form>
+    }
+
+    <p class="muted">Already registered? <a href="/sign-in">Sign in</a>.</p>
+</section>
+
+@code {
+    [SupplyParameterFromQuery(Name = "error")]
+    public string? Error { get; set; }
+
+    private ConsentVersions? versions;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var current = await Authority.GetConsentVersionsAsync();
+            versions = current.Value;
+        }
+        catch (HttpRequestException)
+        {
+            versions = null;
+        }
+    }
+}

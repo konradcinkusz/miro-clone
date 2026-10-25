@@ -1,0 +1,59 @@
+@page "/consent"
+@attribute [ExcludeFromInteractiveRouting]
+@using MiroClone.Web.Auth
+@using MiroClone.Web.Components.Shared
+@inject AuthorityClient Authority
+
+<PageTitle>Accept the updated terms · MiroClone</PageTitle>
+
+<section class="card narrow" aria-labelledby="consent-heading">
+    <h1 id="consent-heading">Accept the updated terms</h1>
+
+    <StatusAlert Message="@Error" />
+
+    @if (versions is null)
+    {
+        <StatusAlert Message="The consent service is not reachable. Try again in a moment." />
+    }
+    else
+    {
+        <p>The terms or the privacy policy changed. Accept the current versions to continue.</p>
+        <form method="post" action="/account/consent" class="stack" data-testid="consent-form">
+            <AntiforgeryToken />
+            <input type="hidden" name="returnUrl" value="@SafeReturnUrl" />
+            <div class="field field-check">
+                <input id="consent-terms" name="terms" type="checkbox" required />
+                <label for="consent-terms">I accept the Terms of Use (version @versions.Terms).</label>
+            </div>
+            <div class="field field-check">
+                <input id="consent-privacy" name="privacy" type="checkbox" required />
+                <label for="consent-privacy">I accept the Privacy Policy (version @versions.Privacy).</label>
+            </div>
+            <button class="btn btn-primary" type="submit" data-testid="consent-submit">Accept and continue</button>
+        </form>
+    }
+</section>
+
+@code {
+    [SupplyParameterFromQuery(Name = "error")]
+    public string? Error { get; set; }
+
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+
+    private ConsentVersions? versions;
+
+    private string SafeReturnUrl => LocalReturnUrl.Resolve(ReturnUrl);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            versions = (await Authority.GetConsentVersionsAsync()).Value;
+        }
+        catch (HttpRequestException)
+        {
+            versions = null;
+        }
+    }
+}
