@@ -1,0 +1,42 @@
+# CanvasService for the estate, DEV (ADR 0017). Owns the "canvas" database only (ADR 0003). Holds the canvas aggregate and the hub (WP05). Called by Boards when a board is deleted (ADR 0013).
+app = "miroclone-canvas-dev"
+primary_region = "fra"
+
+[build]
+  dockerfile = "../MiroClone.CanvasService/Dockerfile"
+  context = ".."
+
+[env]
+  ASPNETCORE_ENVIRONMENT = "Production"
+  ASPNETCORE_URLS = "http://+:8080"
+  Auth__Authority = "https://miroclone-authservice-dev.fly.dev"
+  Auth__Issuer = "MiroClone"
+  Auth__Audience = "miro-clone"
+
+# One machine. Migrations run at startup (ADR 0009), so two instances would migrate at once; "immediate" also means a deploy
+# never overlaps an old and a new revision (ADR 0020).
+[deploy]
+  strategy = "immediate"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 250
+    soft_limit = 200
+
+[[http_service.checks]]
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "60s"
+  method = "GET"
+  path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

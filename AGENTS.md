@@ -15,6 +15,11 @@ Instructions for coding agents and contributors. `CLAUDE.md` imports this file.
 | `docs/AUTH.md` | Claims, token rules and the dev sign-in flow against authservice | WP03 |
 | `scripts/seed-dev-users.sh` | Seeds two dev users in one authservice organization over its API | WP03 |
 | `.github/workflows/` | `pr-validation` (restore/build/test), `secret-scan` (gitleaks) | WP00 |
+| `flyio/` | Fly.io config, one `*.fly.toml` per app, `SECRETS.md`, `INFRASTRUCTURE-ANALYSIS.md` | WP13 |
+| `MiroClone.*/Dockerfile`, `.dockerignore` | Production images; build context is the repository root | WP13 |
+| `.github/workflows/flyio*.yml` | Tag deploy (`flyio.yml`), PR previews and teardown, dev destroy. Secrets come from environment `dev-fly` | WP13 |
+| `scripts/flyio-pr-database.sh` | Creates or drops a preview's databases and role on the dev PostgreSQL | WP13 |
+| `docs/DEPLOYMENT.md` | Owner steps, verification after the first deploy, operations | WP13 |
 | `.githooks/` + `scripts/install-hooks.sh` | Pre-commit gitleaks hook (fails closed) | WP00 |
 | `MiroClone.AppHost` | Aspire composition root: PostgreSQL (`boards`, `canvas`, `authservice`), pinned authservice image, services, web | WP02, WP03 |
 | `MiroClone.ServiceDefaults` | Shared kernel (no domain types), ceiling 800 lines (ADR 0005) | WP01 |

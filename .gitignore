@@ -25,3 +25,6 @@ TestResults/
 # OS noise
 .DS_Store
 Thumbs.db
+
+# Generated per-PR deploy configs (flyio-pr-env-deploy.yml); never committed.
+flyio/.generated/

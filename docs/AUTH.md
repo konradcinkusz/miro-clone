@@ -95,4 +95,4 @@ again before `organization` appears (`TokenService.BuildClaimsAsync`).
 
 - **Sign-up, sign-in and sign-out pages** in the web app (WP06). The web app gets the authority settings now, and no sign-in code yet.
 - **Choosing an active workspace** for users with several organizations. Owner decision, see ADR 0011.
-- **Production configuration:** `Database__SchemaMode=Migrate`, https metadata, and secrets from the platform (WP13).
+- **Production configuration:** done in WP13. `flyio/authservice.fly.toml` sets `Database__SchemaMode=Migrate` and RS256, and the key and database come from platform secrets. See [DEPLOYMENT.md](DEPLOYMENT.md).

@@ -4,10 +4,12 @@ using MiroClone.Web.Components;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
+builder.Services.AddProxyForwardedHeaders();
 builder.Services.AddOriginGuard(builder.Configuration);
-builder.Services.AddWebApp();
+builder.Services.AddWebApp(builder.Configuration);
 
 var app = builder.Build();
+app.UseProxyForwardedHeaders();
 app.UseOriginGuard();
 app.MapDefaultEndpoints();
 app.MapStaticAssets();

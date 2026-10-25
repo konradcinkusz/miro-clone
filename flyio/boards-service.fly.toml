@@ -1,0 +1,43 @@
+# BoardsService for the estate, DEV (ADR 0017). Owns the "boards" database only (ADR 0003). The purge of a deleted board's canvas calls this (ADR 0013). Boards does not WaitFor Canvas: the purge is best effort.
+app = "miroclone-boards-dev"
+primary_region = "fra"
+
+[build]
+  dockerfile = "../MiroClone.BoardsService/Dockerfile"
+  context = ".."
+
+[env]
+  ASPNETCORE_ENVIRONMENT = "Production"
+  ASPNETCORE_URLS = "http://+:8080"
+  Auth__Authority = "https://miroclone-authservice-dev.fly.dev"
+  Auth__Issuer = "MiroClone"
+  Auth__Audience = "miro-clone"
+  Canvas__BaseUrl = "https://miroclone-canvas-dev.fly.dev/"
+
+# One machine. Migrations run at startup (ADR 0009), so two instances would migrate at once; "immediate" also means a deploy
+# never overlaps an old and a new revision (ADR 0020).
+[deploy]
+  strategy = "immediate"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 250
+    soft_limit = 200
+
+[[http_service.checks]]
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "60s"
+  method = "GET"
+  path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

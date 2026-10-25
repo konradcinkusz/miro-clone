@@ -38,6 +38,7 @@ internal static class ServiceHost
         });
         builder.Configuration.AddInMemoryCollection(settings);
         builder.AddServiceDefaults();
+        builder.Services.AddProxyForwardedHeaders();
         builder.Services.AddOriginGuard(builder.Configuration);
         builder.Services.AddCanvasService(builder.Configuration, options => options.BackchannelHttpHandler = authority.Backchannel);
 
@@ -53,6 +54,7 @@ internal static class ServiceHost
         configure?.Invoke(builder.Services);
 
         var app = builder.Build();
+        app.UseProxyForwardedHeaders();
         app.UseOriginGuard();
         app.UseAuthentication();
         app.UseAuthorization();
