@@ -1,0 +1,210 @@
+# Ephemeral preview of the estate for each pull request (WP13, pr-preview-environments).
+# Apps: miroclone-{authservice,canvas,boards,web}-pr-<N>. Shared: the dev PostgreSQL, with one database per service and one
+# login role per PR, created on the fly (scripts/flyio-pr-database.sh). Each preview's authservice has its own RS256 key,
+# generated here and never stored (shared-service-reuse §1). Teardown: flyio-pr-env-destroy.yml, on close.
+# The static estate must already be deployed (flyio.yml), because the preview depends on its PostgreSQL app.
+name: flyio-pr-env-deploy
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+# One deploy per PR at a time: a force-push mid-deploy queues rather than interleaves.
+concurrency:
+  group: pr-env-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+env:
+  FLY_REGION: fra
+  PG_APP: miroclone-postgres-dev
+  PG_HOST: miroclone-postgres-dev.internal
+  PR_NUMBER: ${{ github.event.pull_request.number }}
+
+jobs:
+  guard:
+    name: draft guard
+    # No environment binding: a draft must not stall on an approval nobody will give (pr-preview-environments §4).
+    # Fork PRs get no secrets, so they are not deployed.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    outputs:
+      deploy: ${{ steps.check.outputs.deploy }}
+    steps:
+      - id: check
+        run: echo "deploy=${{ !github.event.pull_request.draft }}" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: build ${{ matrix.service }}
+    needs: guard
+    if: needs.guard.outputs.deploy == 'true'
+    runs-on: ubuntu-latest
+    environment: dev-fly
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: boards
+            dockerfile: MiroClone.BoardsService/Dockerfile
+          - service: canvas
+            dockerfile: MiroClone.CanvasService/Dockerfile
+          - service: web
+            dockerfile: MiroClone.Web/Dockerfile
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      FLY_ORG: ${{ vars.FLY_ORG }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Ensure the preview apps exist
+        run: |
+          set -euo pipefail
+          for service in authservice canvas boards web; do
+            app="miroclone-${service}-pr-${PR_NUMBER}"
+            if ! flyctl apps list --json | jq -e --arg a "$app" 'any(.[]; (.Name // .name) == $a)' >/dev/null; then
+              flyctl apps create "$app" --org "${FLY_ORG:-personal}" --yes
+            fi
+          done
+
+      - name: Authenticate Docker to registry.fly.io
+        run: flyctl auth docker
+
+      - name: Build and push ${{ matrix.service }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          tags: registry.fly.io/miroclone-${{ matrix.service }}-pr-${{ env.PR_NUMBER }}:${{ github.event.pull_request.head.sha }}
+          cache-from: type=gha,scope=pr-${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=pr-${{ matrix.service }}
+
+  deploy:
+    name: deploy preview
+    needs: [guard, build]
+    if: needs.guard.outputs.deploy == 'true' && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    environment: dev-fly
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      FLY_ORG: ${{ vars.FLY_ORG }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Create this PR's databases and role, and a password for them
+        run: |
+          set -euo pipefail
+          password=$(openssl rand -hex 24)
+          echo "::add-mask::$password"
+          echo "PR_DB_PASSWORD=$password" >> "$GITHUB_ENV"
+          PR_DB_PASSWORD="$password" scripts/flyio-pr-database.sh create "$PR_NUMBER" "$PG_APP"
+
+      - name: Generate the preview authservice key and stage secrets
+        run: |
+          set -euo pipefail
+          # PKCS#8 RS256, generated per PR and held only in this step's memory and the Fly secret store (ADR 0011 §3).
+          jwt_key=$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048)
+          flyctl secrets set --stage --app "miroclone-authservice-pr-${PR_NUMBER}" \
+            "ConnectionStrings__DefaultConnection=Host=${PG_HOST};Port=5432;Database=authservice_pr_${PR_NUMBER};Username=pr_${PR_NUMBER};Password=${PR_DB_PASSWORD};SSL Mode=Disable" \
+            "Jwt__PrivateKeyPem=${jwt_key}"
+          flyctl secrets set --stage --app "miroclone-boards-pr-${PR_NUMBER}" \
+            "ConnectionStrings__boards=Host=${PG_HOST};Port=5432;Database=boards_pr_${PR_NUMBER};Username=pr_${PR_NUMBER};Password=${PR_DB_PASSWORD};SSL Mode=Disable"
+          flyctl secrets set --stage --app "miroclone-canvas-pr-${PR_NUMBER}" \
+            "ConnectionStrings__canvas=Host=${PG_HOST};Port=5432;Database=canvas_pr_${PR_NUMBER};Username=pr_${PR_NUMBER};Password=${PR_DB_PASSWORD};SSL Mode=Disable"
+
+      - name: Ensure the preview web key volume exists
+        run: |
+          set -euo pipefail
+          app="miroclone-web-pr-${PR_NUMBER}"
+          if ! flyctl volumes list --app "$app" --json | jq -e 'any(.[]; (.name // .Name) == "web_keys")' >/dev/null; then
+            flyctl volumes create web_keys --app "$app" --region "$FLY_REGION" --size 1 --yes
+          fi
+
+      - name: Deploy the preview estate, in dependency order
+        run: |
+          set -euo pipefail
+          # The same configs as the dev estate, with three changes per preview: the app name, min_machines_running = 0
+          # (pr-preview-environments §6), and the addresses of this PR's own authservice and canvas.
+          preview_config() { # preview_config <file>
+            sed -e "s/^app = .*/app = \"miroclone-${2}-pr-${PR_NUMBER}\"/" \
+                -e 's/min_machines_running = 1/min_machines_running = 0/' \
+                "flyio/$1" > "flyio/.generated/$1"
+          }
+          mkdir -p flyio/.generated
+          preview_config authservice.fly.toml authservice
+          preview_config canvas-service.fly.toml canvas
+          preview_config boards-service.fly.toml boards
+          preview_config web.fly.toml web
+
+          auth_url="https://miroclone-authservice-pr-${PR_NUMBER}.fly.dev"
+          canvas_url="https://miroclone-canvas-pr-${PR_NUMBER}.fly.dev/"
+
+          flyctl deploy --config flyio/.generated/authservice.fly.toml \
+            --app "miroclone-authservice-pr-${PR_NUMBER}" \
+            --image ghcr.io/konradcinkusz/authservice:v0.3.4 \
+            --env "Jwt__PublicBaseUrl=${auth_url}" \
+            --ha=false --wait-timeout 300
+
+          flyctl deploy --config flyio/.generated/canvas-service.fly.toml \
+            --app "miroclone-canvas-pr-${PR_NUMBER}" \
+            --image "registry.fly.io/miroclone-canvas-pr-${PR_NUMBER}:${{ github.event.pull_request.head.sha }}" \
+            --env "Auth__Authority=${auth_url}" \
+            --ha=false --wait-timeout 300
+
+          flyctl deploy --config flyio/.generated/boards-service.fly.toml \
+            --app "miroclone-boards-pr-${PR_NUMBER}" \
+            --image "registry.fly.io/miroclone-boards-pr-${PR_NUMBER}:${{ github.event.pull_request.head.sha }}" \
+            --env "Auth__Authority=${auth_url}" \
+            --env "Canvas__BaseUrl=${canvas_url}" \
+            --ha=false --wait-timeout 300
+
+          flyctl deploy --config flyio/.generated/web.fly.toml \
+            --app "miroclone-web-pr-${PR_NUMBER}" \
+            --image "registry.fly.io/miroclone-web-pr-${PR_NUMBER}:${{ github.event.pull_request.head.sha }}" \
+            --env "Auth__Authority=${auth_url}" \
+            --ha=false --wait-timeout 300
+
+      - name: Post or update the sticky status comment
+        uses: actions/github-script@v7
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        with:
+          script: |
+            const marker = '<!-- miroclone-pr-env -->';
+            const pr = context.issue.number;
+            const sha = process.env.HEAD_SHA.slice(0, 7);
+            const body = [
+              marker,
+              '### Preview environment',
+              '',
+              `| Service | URL |`,
+              `| --- | --- |`,
+              `| Web | https://miroclone-web-pr-${pr}.fly.dev |`,
+              `| authservice | https://miroclone-authservice-pr-${pr}.fly.dev |`,
+              '',
+              `Deployed from \`${sha}\`. Torn down when this pull request closes.`,
+            ].join('\n');
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: pr,
+            });
+            const mine = comments.find((comment) => comment.body && comment.body.includes(marker));
+            if (mine) {
+              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: mine.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: pr, body });
+            }

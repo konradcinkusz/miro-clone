@@ -1,0 +1,65 @@
+# Manual teardown of the dev estate on Fly.io (WP13, fly-io-deployment §12). Behind a typed confirmation.
+# Apps are destroyed in reverse dependency order. The PostgreSQL app and its data are kept unless delete_data is ticked,
+# because a destroyed app takes its volume with it.
+name: flyio-destroy-dev
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type destroy-dev to confirm.
+        type: string
+        required: true
+      delete_data:
+        description: Also destroy the PostgreSQL app and its volume. All databases are lost.
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flyio-destroy-dev
+  cancel-in-progress: false
+
+jobs:
+  destroy:
+    name: destroy dev estate
+    runs-on: ubuntu-latest
+    environment: dev-fly
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      DELETE_DATA: ${{ inputs.delete_data }}
+    steps:
+      - name: Check the typed confirmation
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          if [ "$CONFIRM" != "destroy-dev" ]; then
+            echo "Confirmation text does not match destroy-dev. Nothing was destroyed." >&2
+            exit 1
+          fi
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Destroy the application apps (existing ones only)
+        run: |
+          set -euo pipefail
+          for app in miroclone-web-dev miroclone-boards-dev miroclone-canvas-dev miroclone-authservice-dev; do
+            if flyctl apps list --json | jq -e --arg a "$app" 'any(.[]; (.Name // .name) == $a)' >/dev/null; then
+              flyctl apps destroy "$app" --yes
+            else
+              echo "$app does not exist: skipped"
+            fi
+          done
+
+      - name: Destroy PostgreSQL only when asked
+        run: |
+          set -euo pipefail
+          if [ "$DELETE_DATA" != "true" ]; then
+            echo "PostgreSQL and its volume are kept (delete_data is off)."
+            exit 0
+          fi
+          if flyctl apps list --json | jq -e 'any(.[]; (.Name // .name) == "miroclone-postgres-dev")' >/dev/null; then
+            flyctl apps destroy miroclone-postgres-dev --yes
+          fi
