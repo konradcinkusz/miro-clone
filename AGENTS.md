@@ -15,11 +15,11 @@ Instructions for coding agents and contributors. `CLAUDE.md` imports this file.
 | `.github/workflows/` | `pr-validation` (restore/build/test), `secret-scan` (gitleaks) | WP00 |
 | `.githooks/` + `scripts/install-hooks.sh` | Pre-commit gitleaks hook (fails closed) | WP00 |
 | `MiroClone.AppHost` | Aspire composition root | planned, WP01 |
-| `MiroClone.ServiceDefaults` | Shared kernel (no domain types) | planned, WP01 |
+| `MiroClone.ServiceDefaults` | Shared kernel (no domain types), ceiling 800 lines (ADR 0005) | WP01 |
 | `MiroClone.BoardsService` | Boards and favourites, PostgreSQL `boards` | planned, WP03+ |
 | `MiroClone.CanvasService` | Canvas aggregate, JSON snapshot, SignalR `/hubs/canvas` | planned, WP04+ |
 | `MiroClone.Web` | Blazor Web App, interactive Server; the BFF | planned, WP05+ |
-| `tests/` | One xUnit project per service; `Web.Tests` (bUnit); `Web.E2E` (Playwright) | planned |
+| `tests/` | One xUnit project per service; `Web.Tests` (bUnit); `Web.E2E` (Playwright). `MiroClone.ServiceDefaults.Tests` exists (WP01) | partial |
 
 ## Build and test
 
