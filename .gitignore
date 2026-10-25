@@ -28,3 +28,6 @@ Thumbs.db
 
 # Web app: Data Protection keys persisted on the developer machine (ServiceCollectionExtensions.AddDataProtection)
 App_Data/
+
+# Generated per-PR deploy configs (flyio-pr-env-deploy.yml); never committed.
+flyio/.generated/

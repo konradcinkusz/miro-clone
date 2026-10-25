@@ -30,5 +30,5 @@ that: login and refresh return the same token with every membership in it, and t
 - Users in two organizations cannot open boards until authservice issues a token for one organization. This is the owner's decision.
 - **Recommended option for the owner:** authservice adds an endpoint that issues a token scoped to one organization for the caller
   (for example `POST api/v1/auth/organization` taking an organization id, and returning a new token pair with that single `organization`
-  claim). The web app then needs only a button that calls it, and ADR 0019 is superseded by that change. Either way, the services keep
+  claim). The web app then needs only a button that calls it, and ADR 0024 is superseded by that change. Either way, the services keep
   reading `WorkspaceClaims` as they do today.

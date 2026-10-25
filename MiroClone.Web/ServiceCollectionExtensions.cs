@@ -12,8 +12,11 @@ namespace MiroClone.Web;
 
 public static class ServiceCollectionExtensions
 {
-    /// <summary>Configuration under "DataProtection": where the keys are persisted, so a restart does not sign anyone out.</summary>
-    public const string DataProtectionKeyDirectoryKey = "DataProtection:KeyDirectory";
+    /// <summary>
+    /// Configuration key for the Data Protection key ring (docs/decisions/0019-web-data-protection-keys-on-a-volume.md). Set to /data/keys on Fly; defaults to
+    /// App_Data/keys under the content root. The ring is always persisted, so a restart does not sign anyone out.
+    /// </summary>
+    public const string DataProtectionKeysPathKey = "DataProtection:KeysPath";
 
     /// <summary>
     /// The web app's services: interactive Server components, cookie sign-in with the session store behind it, the typed
@@ -65,7 +68,7 @@ public static class ServiceCollectionExtensions
 
     private static void AddDataProtection(IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
-        var keyDirectory = configuration[DataProtectionKeyDirectoryKey]
+        var keyDirectory = configuration[DataProtectionKeysPathKey]
             ?? Path.Combine(environment.ContentRootPath, "App_Data", "keys");
 
         // Cookies and antiforgery tokens are encrypted with these keys. Persisted to a directory (the volume in deployment), so

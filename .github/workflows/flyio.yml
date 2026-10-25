@@ -1,0 +1,432 @@
+# Tag-driven deploy to Fly.io (WP13, fly-io-deployment §10). A v* tag is the act of deploying.
+#   test -> detect -> build (once per image) -> postgres -> authservice -> canvas -> boards -> web -> verify
+# Images are built once and deployed with --image. A service whose Fly app is missing is always selected, so a cold
+# estate comes up from one tag. The PostgreSQL app is gated on its own config (fly-io-deployment §10).
+# Secrets are read from the GitHub environment "dev-fly" (flyio/SECRETS.md). Nothing is stored in the tree.
+name: flyio
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      force_full_redeploy:
+        description: Redeploy every application service, ignoring change detection (not PostgreSQL or authservice).
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flyio-deploy-tag
+  cancel-in-progress: false
+
+env:
+  FLY_REGION: fra
+  TAG: ${{ github.ref_name }}
+  APP_POSTGRES: miroclone-postgres-dev
+  APP_AUTHSERVICE: miroclone-authservice-dev
+  APP_CANVAS: miroclone-canvas-dev
+  APP_BOARDS: miroclone-boards-dev
+  APP_WEB: miroclone-web-dev
+  PG_HOST: miroclone-postgres-dev.internal
+  AUTH_URL: https://miroclone-authservice-dev.fly.dev
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Repo guards
+        run: |
+          set -euo pipefail
+          scripts/check-kernel-size.sh
+          # One authservice release is pinned in two places (ADR 0011). A mismatch would deploy a different one from the AppHost.
+          app_tag=$(grep -oE 'AuthServiceTag = "[^"]+"' MiroClone.AppHost/EstateExtensions.cs | cut -d'"' -f2)
+          fly_tag=$(grep -oE 'ghcr\.io/konradcinkusz/authservice:[^"]+' flyio/authservice.fly.toml | cut -d: -f2)
+          if [ "$app_tag" != "$fly_tag" ]; then
+            echo "authservice tag differs: AppHost $app_tag, flyio/authservice.fly.toml $fly_tag" >&2
+            exit 1
+          fi
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - run: dotnet build MiroClone.sln --configuration Release
+      - run: dotnet test MiroClone.sln --configuration Release --no-build
+
+  detect:
+    name: detect
+    needs: test
+    runs-on: ubuntu-latest
+    environment: dev-fly
+    outputs:
+      postgres: ${{ steps.plan.outputs.postgres }}
+      authservice: ${{ steps.plan.outputs.authservice }}
+      boards: ${{ steps.plan.outputs.boards }}
+      canvas: ${{ steps.plan.outputs.canvas }}
+      web: ${{ steps.plan.outputs.web }}
+      build: ${{ steps.plan.outputs.build }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Plan the deploy
+        id: plan
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          FORCE: ${{ inputs.force_full_redeploy }}
+        run: |
+          set -euo pipefail
+
+          # A tag compares with the previous tag. A manual run compares HEAD with the last tag it descends from.
+          if [ "$EVENT" = "push" ]; then
+            rev="$TAG"
+            base_rev="$TAG^"
+          else
+            rev="HEAD"
+            base_rev="HEAD"
+          fi
+          base=$(git describe --tags --abbrev=0 "$base_rev" 2>/dev/null || git rev-list --max-parents=0 HEAD | tail -n1)
+          files=$(git diff --name-only "$base" "$rev")
+          full=false
+          if [ "$FORCE" = "true" ]; then full=true; fi
+
+          changed() { grep -Eq "$1" <<<"$files"; }
+          exists() { flyctl apps list --json | jq -e --arg a "$1" 'any(.[]; (.Name // .name) == $a)' >/dev/null; }
+
+          # Kernel, shared build settings and the SDK pin invalidate every application image (ADR 0005, fly-io-deployment §10).
+          shared='^(MiroClone\.ServiceDefaults/|Directory\.(Build|Packages)\.props$|global\.json$|\.editorconfig$|\.dockerignore$)'
+          app_wanted() { # app_wanted <app> <own-path-pattern>
+            [ "$full" = true ] || changed "$shared" || changed "$2" || ! exists "$1"
+          }
+
+          if changed '^flyio/postgres\.fly\.toml$' || ! exists "$APP_POSTGRES"; then postgres=true; else postgres=false; fi
+          if changed '^flyio/authservice\.fly\.toml$|^MiroClone\.AppHost/EstateExtensions\.cs$' || ! exists "$APP_AUTHSERVICE"; then
+            authservice=true
+          else
+            authservice=false
+          fi
+          if app_wanted "$APP_BOARDS" '^MiroClone\.BoardsService/|^flyio/boards-service\.fly\.toml$'; then boards=true; else boards=false; fi
+          if app_wanted "$APP_CANVAS" '^MiroClone\.CanvasService/|^flyio/canvas-service\.fly\.toml$'; then canvas=true; else canvas=false; fi
+          if app_wanted "$APP_WEB" '^MiroClone\.Web/|^flyio/web\.fly\.toml$'; then web=true; else web=false; fi
+
+          include='[]'
+          add() { include=$(jq -c --arg s "$1" --arg a "$2" --arg d "$3" '. + [{service: $s, app: $a, dockerfile: $d}]' <<<"$include"); }
+          if [ "$boards" = true ]; then add boards "$APP_BOARDS" MiroClone.BoardsService/Dockerfile; fi
+          if [ "$canvas" = true ]; then add canvas "$APP_CANVAS" MiroClone.CanvasService/Dockerfile; fi
+          if [ "$web" = true ]; then add web "$APP_WEB" MiroClone.Web/Dockerfile; fi
+          matrix=$(jq -c -n --argjson i "$include" '{include: $i}')
+          if [ "$(jq length <<<"$include")" -gt 0 ]; then build=true; else build=false; fi
+
+          {
+            echo "postgres=$postgres"
+            echo "authservice=$authservice"
+            echo "boards=$boards"
+            echo "canvas=$canvas"
+            echo "web=$web"
+            echo "build=$build"
+            echo "matrix=$matrix"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Plan: postgres=$postgres authservice=$authservice boards=$boards canvas=$canvas web=$web (base $base)"
+
+  build:
+    name: build ${{ matrix.service }}
+    needs: detect
+    if: needs.detect.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    environment: dev-fly
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.detect.outputs.matrix) }}
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      FLY_ORG: ${{ vars.FLY_ORG }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Ensure the Fly app exists
+        run: |
+          set -euo pipefail
+          if ! flyctl apps list --json | jq -e --arg a "${{ matrix.app }}" 'any(.[]; (.Name // .name) == $a)' >/dev/null; then
+            flyctl apps create "${{ matrix.app }}" --org "${FLY_ORG:-personal}" --yes
+          fi
+
+      - name: Authenticate Docker to registry.fly.io
+        run: flyctl auth docker
+
+      - name: Build and push ${{ matrix.service }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          tags: registry.fly.io/${{ matrix.app }}:${{ env.TAG }}
+          cache-from: type=gha,scope=flyio-${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=flyio-${{ matrix.service }}
+
+  deploy_postgres:
+    name: PostgreSQL
+    needs: [test, detect, build]
+    if: >-
+      ${{ always() && !cancelled() && needs.test.result == 'success' && needs.detect.outputs.postgres == 'true'
+          && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    environment: dev-fly
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      FLY_ORG: ${{ vars.FLY_ORG }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Ensure the app and its volume exist
+        run: |
+          set -euo pipefail
+          if ! flyctl apps list --json | jq -e --arg a "$APP_POSTGRES" 'any(.[]; (.Name // .name) == $a)' >/dev/null; then
+            flyctl apps create "$APP_POSTGRES" --org "${FLY_ORG:-personal}" --yes
+          fi
+          if ! flyctl volumes list --app "$APP_POSTGRES" --json | jq -e 'any(.[]; (.name // .Name) == "postgres_data")' >/dev/null; then
+            flyctl volumes create postgres_data --app "$APP_POSTGRES" --region "$FLY_REGION" --size 10 --yes
+          fi
+
+      - name: Stage the role passwords (read once, by the first-boot init script)
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          BOARDS_DB_PASSWORD: ${{ secrets.BOARDS_DB_PASSWORD }}
+          CANVAS_DB_PASSWORD: ${{ secrets.CANVAS_DB_PASSWORD }}
+          AUTHSERVICE_DB_PASSWORD: ${{ secrets.AUTHSERVICE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          : "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD secret is not set}"
+          : "${BOARDS_DB_PASSWORD:?BOARDS_DB_PASSWORD secret is not set}"
+          : "${CANVAS_DB_PASSWORD:?CANVAS_DB_PASSWORD secret is not set}"
+          : "${AUTHSERVICE_DB_PASSWORD:?AUTHSERVICE_DB_PASSWORD secret is not set}"
+          flyctl secrets set --stage --app "$APP_POSTGRES" \
+            "POSTGRES_PASSWORD=$POSTGRES_PASSWORD" \
+            "BOARDS_DB_PASSWORD=$BOARDS_DB_PASSWORD" \
+            "CANVAS_DB_PASSWORD=$CANVAS_DB_PASSWORD" \
+            "AUTHSERVICE_DB_PASSWORD=$AUTHSERVICE_DB_PASSWORD"
+
+      - name: Deploy PostgreSQL
+        run: |
+          flyctl deploy \
+            --config flyio/postgres.fly.toml \
+            --app "$APP_POSTGRES" \
+            --remote-only \
+            --ha=false \
+            --wait-timeout 300 \
+            .
+
+  deploy_authservice:
+    name: authservice
+    needs: [test, detect, build, deploy_postgres]
+    if: >-
+      ${{ always() && !cancelled() && needs.test.result == 'success' && needs.detect.outputs.authservice == 'true'
+          && (needs.build.result == 'success' || needs.build.result == 'skipped')
+          && (needs.deploy_postgres.result == 'success' || needs.deploy_postgres.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    environment: dev-fly
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      FLY_ORG: ${{ vars.FLY_ORG }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Ensure the app exists
+        run: |
+          set -euo pipefail
+          if ! flyctl apps list --json | jq -e --arg a "$APP_AUTHSERVICE" 'any(.[]; (.Name // .name) == $a)' >/dev/null; then
+            flyctl apps create "$APP_AUTHSERVICE" --org "${FLY_ORG:-personal}" --yes
+          fi
+
+      - name: Stage secrets
+        env:
+          AUTHSERVICE_DB_PASSWORD: ${{ secrets.AUTHSERVICE_DB_PASSWORD }}
+          AUTHSERVICE_JWT_PRIVATE_KEY: ${{ secrets.AUTHSERVICE_JWT_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          : "${AUTHSERVICE_DB_PASSWORD:?AUTHSERVICE_DB_PASSWORD secret is not set}"
+          # A missing key would let authservice start with an ephemeral one, and every token would die on restart (fly-io-deployment §9).
+          : "${AUTHSERVICE_JWT_PRIVATE_KEY:?AUTHSERVICE_JWT_PRIVATE_KEY secret is not set}"
+          flyctl secrets set --stage --app "$APP_AUTHSERVICE" \
+            "ConnectionStrings__DefaultConnection=Host=$PG_HOST;Port=5432;Database=authservice;Username=authservice_app;Password=$AUTHSERVICE_DB_PASSWORD;SSL Mode=Disable" \
+            "Jwt__PrivateKeyPem=$AUTHSERVICE_JWT_PRIVATE_KEY"
+
+      - name: Deploy the pinned authservice image
+        run: |
+          flyctl deploy \
+            --config flyio/authservice.fly.toml \
+            --app "$APP_AUTHSERVICE" \
+            --image ghcr.io/konradcinkusz/authservice:v0.3.4 \
+            --ha=false \
+            --wait-timeout 300
+
+  deploy_canvas:
+    name: CanvasService
+    needs: [test, detect, build, deploy_postgres]
+    if: >-
+      ${{ always() && !cancelled() && needs.test.result == 'success' && needs.detect.outputs.canvas == 'true'
+          && needs.build.result == 'success'
+          && (needs.deploy_postgres.result == 'success' || needs.deploy_postgres.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    environment: dev-fly
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      FLY_ORG: ${{ vars.FLY_ORG }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Ensure the app exists
+        run: |
+          set -euo pipefail
+          if ! flyctl apps list --json | jq -e --arg a "$APP_CANVAS" 'any(.[]; (.Name // .name) == $a)' >/dev/null; then
+            flyctl apps create "$APP_CANVAS" --org "${FLY_ORG:-personal}" --yes
+          fi
+
+      - name: Stage secrets
+        env:
+          CANVAS_DB_PASSWORD: ${{ secrets.CANVAS_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          : "${CANVAS_DB_PASSWORD:?CANVAS_DB_PASSWORD secret is not set}"
+          flyctl secrets set --stage --app "$APP_CANVAS" \
+            "ConnectionStrings__canvas=Host=$PG_HOST;Port=5432;Database=canvas;Username=canvas_app;Password=$CANVAS_DB_PASSWORD;SSL Mode=Disable"
+
+      - name: Deploy
+        run: |
+          flyctl deploy \
+            --config flyio/canvas-service.fly.toml \
+            --app "$APP_CANVAS" \
+            --image "registry.fly.io/$APP_CANVAS:$TAG" \
+            --ha=false \
+            --wait-timeout 300
+
+  deploy_boards:
+    name: BoardsService
+    needs: [test, detect, build, deploy_authservice, deploy_canvas]
+    if: >-
+      ${{ always() && !cancelled() && needs.test.result == 'success' && needs.detect.outputs.boards == 'true'
+          && needs.build.result == 'success'
+          && (needs.deploy_authservice.result == 'success' || needs.deploy_authservice.result == 'skipped')
+          && (needs.deploy_canvas.result == 'success' || needs.deploy_canvas.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    environment: dev-fly
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      FLY_ORG: ${{ vars.FLY_ORG }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Ensure the app exists
+        run: |
+          set -euo pipefail
+          if ! flyctl apps list --json | jq -e --arg a "$APP_BOARDS" 'any(.[]; (.Name // .name) == $a)' >/dev/null; then
+            flyctl apps create "$APP_BOARDS" --org "${FLY_ORG:-personal}" --yes
+          fi
+
+      - name: Stage secrets
+        env:
+          BOARDS_DB_PASSWORD: ${{ secrets.BOARDS_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          : "${BOARDS_DB_PASSWORD:?BOARDS_DB_PASSWORD secret is not set}"
+          flyctl secrets set --stage --app "$APP_BOARDS" \
+            "ConnectionStrings__boards=Host=$PG_HOST;Port=5432;Database=boards;Username=boards_app;Password=$BOARDS_DB_PASSWORD;SSL Mode=Disable"
+
+      - name: Deploy
+        run: |
+          flyctl deploy \
+            --config flyio/boards-service.fly.toml \
+            --app "$APP_BOARDS" \
+            --image "registry.fly.io/$APP_BOARDS:$TAG" \
+            --ha=false \
+            --wait-timeout 300
+
+  deploy_web:
+    name: Web
+    needs: [test, detect, build, deploy_boards, deploy_canvas]
+    if: >-
+      ${{ always() && !cancelled() && needs.test.result == 'success' && needs.detect.outputs.web == 'true'
+          && needs.build.result == 'success'
+          && (needs.deploy_boards.result == 'success' || needs.deploy_boards.result == 'skipped')
+          && (needs.deploy_canvas.result == 'success' || needs.deploy_canvas.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    environment: dev-fly
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      FLY_ORG: ${{ vars.FLY_ORG }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Ensure the app and its key volume exist
+        run: |
+          set -euo pipefail
+          if ! flyctl apps list --json | jq -e --arg a "$APP_WEB" 'any(.[]; (.Name // .name) == $a)' >/dev/null; then
+            flyctl apps create "$APP_WEB" --org "${FLY_ORG:-personal}" --yes
+          fi
+          if ! flyctl volumes list --app "$APP_WEB" --json | jq -e 'any(.[]; (.name // .Name) == "web_keys")' >/dev/null; then
+            flyctl volumes create web_keys --app "$APP_WEB" --region "$FLY_REGION" --size 1 --yes
+          fi
+
+      - name: Deploy
+        run: |
+          flyctl deploy \
+            --config flyio/web.fly.toml \
+            --app "$APP_WEB" \
+            --image "registry.fly.io/$APP_WEB:$TAG" \
+            --ha=false \
+            --wait-timeout 300
+
+  verify:
+    name: verify
+    needs: [test, detect, build, deploy_postgres, deploy_authservice, deploy_canvas, deploy_boards, deploy_web]
+    if: ${{ always() && !cancelled() && needs.test.result == 'success' && !contains(needs.*.result, 'failure') }}
+    runs-on: ubuntu-latest
+    environment: dev-fly
+    steps:
+      - name: JWKS publishes signing keys
+        # The one check a green health probe cannot make: if JWKS is empty, every service rejects every token (fly-io-deployment §10).
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5 6; do
+            if curl -fsS "$AUTH_URL/.well-known/jwks.json" | jq -e '.keys | length > 0' >/dev/null; then
+              echo "JWKS publishes keys"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "JWKS at $AUTH_URL did not publish keys" >&2
+          exit 1
+
+      - name: Web answers its health probe
+        run: curl -fsS "https://${APP_WEB}.fly.dev/health" >/dev/null

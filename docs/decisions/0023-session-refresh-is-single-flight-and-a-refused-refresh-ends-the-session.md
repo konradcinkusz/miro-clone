@@ -28,5 +28,5 @@ A refresh that fails for reasons other than the session ending (an outage) must 
 
 ## Consequences
 
-- The lock is per process. It is correct for one web instance (ADR 0017); a second instance needs a shared lock as well as a shared store.
+- The lock is per process. It is correct for one web instance (ADR 0022); a second instance needs a shared lock as well as a shared store.
 - A token that authservice issues but this app cannot validate ends the session rather than being stored (`ARefreshedTokenThatFailsValidationEndsTheSession`).

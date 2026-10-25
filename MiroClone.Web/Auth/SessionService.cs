@@ -24,7 +24,7 @@ public sealed class SessionSettings
 
 /// <summary>
 /// The server-side session: the access and refresh tokens of one sign-in, held in the distributed cache (blazor-web-app §7).
-/// The browser holds only a cookie that names the session id, so no token reaches the browser (ADR 0014).
+/// The browser holds only a cookie that names the session id, so no token reaches the browser (ADR 0022).
 /// Refresh is single-flight per session: authservice rotates refresh tokens, and a second use of a spent one revokes the family.
 /// </summary>
 public sealed class SessionService(

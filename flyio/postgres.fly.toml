@@ -1,0 +1,58 @@
+# PostgreSQL 17 for the estate, DEV (ADR 0017). One private Fly app, one volume, three logical databases. Each database
+# has its own login role and no cross-grants, so a service that holds its own password cannot reach another's data
+# (shared-service-reuse §5, fly-io-deployment §5 and §8).
+#
+# PRIVATE: no [http_service] and no [[services]]. Reached only at miroclone-postgres-dev.internal:5432 over Fly's 6PN mesh.
+# Connection strings (set as Fly secrets on each consumer, flyio/SECRETS.md):
+#   Host=miroclone-postgres-dev.internal;Port=5432;Database=<db>;Username=<role>;Password=<secret>;SSL Mode=Disable
+# SSL Mode=Disable: the mesh is WireGuard-encrypted, and this image has no TLS certificates (ADR 0017 records the trade-off).
+
+app = "miroclone-postgres-dev"
+primary_region = "fra"
+
+[build]
+  # A pinned major on the vanilla image: a plain flyctl deploy initialises it, and Fly's managed postgres-flex does not (fly-io-deployment §14).
+  image = "postgres:17-alpine"
+
+[env]
+  POSTGRES_USER = "miroclone"
+  POSTGRES_DB = "postgres"
+  # A subdirectory of the mount: the volume root holds lost+found and initdb refuses a non-empty directory (fly-io-deployment §8).
+  PGDATA = "/var/lib/postgresql/data/pgdata"
+  POSTGRES_INITDB_ARGS = "--encoding=UTF8 --locale=C"
+
+[[mounts]]
+  source = "postgres_data"
+  destination = "/var/lib/postgresql/data"
+  initial_size = "10gb"
+
+# Runs once, when the data directory is empty (first boot). The passwords are Fly secrets set by the deploy workflow before
+# the first deploy (flyio/SECRETS.md). Rotating one later is an ALTER ROLE by the owner, not a redeploy.
+[[files]]
+  guest_path = "/docker-entrypoint-initdb.d/01-service-databases.sh"
+  raw_value = """#!/bin/sh
+set -eu
+: "${BOARDS_DB_PASSWORD:?BOARDS_DB_PASSWORD secret is not set}"
+: "${CANVAS_DB_PASSWORD:?CANVAS_DB_PASSWORD secret is not set}"
+: "${AUTHSERVICE_DB_PASSWORD:?AUTHSERVICE_DB_PASSWORD secret is not set}"
+
+create_service_database() {
+  role="$1"
+  database="$2"
+  password="$3"
+  psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres <<EOSQL
+CREATE ROLE $role LOGIN PASSWORD '$password';
+CREATE DATABASE $database OWNER $role;
+REVOKE CONNECT ON DATABASE $database FROM PUBLIC;
+EOSQL
+}
+
+create_service_database boards_app boards "$BOARDS_DB_PASSWORD"
+create_service_database canvas_app canvas "$CANVAS_DB_PASSWORD"
+create_service_database authservice_app authservice "$AUTHSERVICE_DB_PASSWORD"
+"""
+
+# No [http_service]: no public listener and no proxy smoke check, so a deploy waits on the machine, not on HTTP.
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"

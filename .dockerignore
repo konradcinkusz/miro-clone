@@ -1,0 +1,15 @@
+# Build context is the repository root (ADR 0017). Keep local output, history and non-build material out of every image.
+**/bin
+**/obj
+**/.vs
+**/.idea
+.git
+.github
+.claude
+docs
+flyio
+scripts
+tests
+**/*.md
+.env
+.env.*

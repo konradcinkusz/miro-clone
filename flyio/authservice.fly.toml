@@ -1,0 +1,46 @@
+# authservice for the estate, DEV (ADR 0011, shared-service-reuse). A consumer's own instance of the pinned release:
+# its own compute, its own database (miroclone-postgres-dev, database "authservice") and its own RS256 signing key.
+# No key or database is shared with any other instance of authservice.
+
+app = "miroclone-authservice-dev"
+primary_region = "fra"
+
+[build]
+  # Pulled, never built, and never :latest (shared-service-reuse §2). Must equal EstateExtensions.AuthServiceTag (ADR 0011);
+  # the flyio workflow fails when the two differ.
+  image = "ghcr.io/konradcinkusz/authservice:v0.3.4"
+
+[env]
+  ASPNETCORE_ENVIRONMENT = "Production"
+  ASPNETCORE_URLS = "http://+:8080"
+  # Migrations at startup, not EnsureCreated (ADR 0011 §2, fly-io-deployment §8).
+  Database__SchemaMode = "Migrate"
+  Jwt__Algorithm = "RS256"
+  Jwt__Issuer = "MiroClone"
+  Jwt__Audience = "miro-clone"
+  # The discovery document's jwks_uri is built from this, so it must be the address every service fetches.
+  Jwt__PublicBaseUrl = "https://miroclone-authservice-dev.fly.dev"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  # Every service validates tokens against this app's JWKS on the request path (fly-io-deployment §7), so one machine stays up.
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 250
+    soft_limit = 200
+
+[[http_service.checks]]
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "60s"
+  method = "GET"
+  path = "/health/ready"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

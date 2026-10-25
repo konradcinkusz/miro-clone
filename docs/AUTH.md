@@ -88,12 +88,12 @@ them (fail closed, ADR 0011). Choosing an active workspace needs an authservice 
 | Invite | `POST /api/v1/organizations/{id}/invite` | seed script |
 | Accept invitation | `POST /api/v1/organizations/invitations/accept` | seed script |
 | Sign in | `POST /api/v1/auth/login` | web app sign-in (WP06) |
-| Refresh | `POST /api/v1/auth/refresh` | web app session refresh (WP06, ADR 0018) |
+| Refresh | `POST /api/v1/auth/refresh` | web app session refresh (WP06, ADR 0023) |
 | Sign out | `POST /api/v1/auth/logout` | web app sign-out (WP06) |
-| Current user and consent status | `GET /api/v1/auth/me` | web app consent check at sign-in (WP06, ADR 0020) |
+| Current user and consent status | `GET /api/v1/auth/me` | web app consent check at sign-in (WP06, ADR 0025) |
 | Consent versions and acceptance | `GET /api/v1/auth/consents/versions`, `POST /api/v1/auth/consents` | web app sign-up and consent page (WP06) |
 | Verify, resend, forgot, reset | `POST /api/v1/auth/verify-email`, `resend-verification`, `forgot-password`, `reset-password` | web app account pages (WP06) |
-| List organizations | `GET /api/v1/organizations` | web app workspace state (WP06, ADR 0019) |
+| List organizations | `GET /api/v1/organizations` | web app workspace state (WP06, ADR 0024) |
 
 Organization membership reaches a token only when that token is issued. A user who joins an organization must sign in
 again before `organization` appears (`TokenService.BuildClaimsAsync`).
@@ -102,19 +102,19 @@ again before `organization` appears (`TokenService.BuildClaimsAsync`).
 
 The web app is a backend-for-frontend: its account pages post to `/account/*` endpoints, which call authservice and keep the
 tokens in a server-side session. The browser holds an HttpOnly, SameSite=Strict cookie that names the session and carries no
-token. The decisions are ADR 0017 (the session model), ADR 0018 (refresh), ADR 0019 (the workspace) and ADR 0020 (verification,
+token. The decisions are ADR 0022 (the session model), ADR 0023 (refresh), ADR 0024 (the workspace) and ADR 0025 (verification,
 consent and reset).
 
 Running it with the estate: sign up at `/sign-up`, then sign in at `/sign-in`. A new account has no organization, so the
 dashboard says so. To see the workspace, create an organization through authservice's API, then sign in again: the token is
 issued afresh and carries it. Two or more organizations show the choice, and boards stay closed until authservice issues a
-token for one (ADR 0019).
+token for one (ADR 0024).
 
 ## Not done in this work package
 
 - **Choosing an active workspace** for users with several organizations. authservice issues no organization-scoped token, so
-  the dashboard states the choice and waits. Owner decision, see ADR 0011 and ADR 0019.
-- **Two-factor sign-in.** A second-factor challenge is refused with a message (ADR 0020).
-- **Consent is checked at sign-in only** (ADR 0020). The dashboard does not re-check it on each page.
-- **One web instance.** Sessions live in the process's memory (ADR 0017). Shared sessions and affinity come with a deployment decision (WP13).
-- **Production configuration:** `Database__SchemaMode=Migrate`, https metadata, and secrets from the platform (WP13).
+  the dashboard states the choice and waits. Owner decision, see ADR 0011 and ADR 0024.
+- **Two-factor sign-in.** A second-factor challenge is refused with a message (ADR 0025).
+- **Consent is checked at sign-in only** (ADR 0025). The dashboard does not re-check it on each page.
+- **One web instance.** Sessions live in the process's memory (ADR 0022). Shared sessions and affinity come with a deployment decision (WP13).
+- **Production configuration:** done in WP13. `flyio/authservice.fly.toml` sets `Database__SchemaMode=Migrate` and RS256, and the key and database come from platform secrets. See [DEPLOYMENT.md](DEPLOYMENT.md).

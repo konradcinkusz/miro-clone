@@ -20,7 +20,7 @@ authservice is a credential API, not an OpenID Connect provider: it takes an ema
   verification flag and the session id, and nothing else. Tests assert that no token value is in the cookie principal.
 - **The host validates the token when it takes it in.** `AccessTokenValidator` checks the RS256 signature against authservice's discovery
   keys, and the issuer, audience and lifetime, with the rules the services use (ADR 0007, ADR 0011). A token that fails is never stored.
-- **The workspace is read from the stored token, not from the cookie**, so it is never older than the last refresh (see ADR 0019).
+- **The workspace is read from the stored token, not from the cookie**, so it is never older than the last refresh (see ADR 0024).
 - **A circuit asks the store again.** `SessionRevalidatingAuthenticationStateProvider` checks every five minutes that the session still exists;
   a session that ended ends the circuit's sign-in.
 - **Sign-out ends the session everywhere it can.** It calls authservice's logout, which revokes every refresh token of the user (its own
