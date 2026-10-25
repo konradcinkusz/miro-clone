@@ -1,0 +1,5 @@
+/* Scoped to MainLayout. Colours arrive as design tokens with WP07/UI work, never as literals here. */
+main {
+    display: block;
+    padding: 16px;
+}

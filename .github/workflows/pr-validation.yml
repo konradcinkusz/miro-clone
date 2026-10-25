@@ -1,5 +1,5 @@
 # PR validation: restore, build and test the solution.
-# Skips cleanly while the tree has no .csproj files (WP00 is an empty solution).
+# Skips the build and test steps while the tree has no .csproj files.
 name: pr-validation
 
 on:

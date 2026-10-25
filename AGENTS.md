@@ -14,12 +14,12 @@ Instructions for coding agents and contributors. `CLAUDE.md` imports this file.
 | `docs/decisions/` | ADRs (`NNNN-title.md`), each citing the principle it applies | WP00 |
 | `.github/workflows/` | `pr-validation` (restore/build/test), `secret-scan` (gitleaks) | WP00 |
 | `.githooks/` + `scripts/install-hooks.sh` | Pre-commit gitleaks hook (fails closed) | WP00 |
-| `MiroClone.AppHost` | Aspire composition root | planned, WP01 |
+| `MiroClone.AppHost` | Aspire composition root: PostgreSQL (`boards`, `canvas`), services, web | WP02 |
 | `MiroClone.ServiceDefaults` | Shared kernel (no domain types), ceiling 800 lines (ADR 0005) | WP01 |
-| `MiroClone.BoardsService` | Boards and favourites, PostgreSQL `boards` | planned, WP03+ |
-| `MiroClone.CanvasService` | Canvas aggregate, JSON snapshot, SignalR `/hubs/canvas` | planned, WP04+ |
-| `MiroClone.Web` | Blazor Web App, interactive Server; the BFF | planned, WP05+ |
-| `tests/` | One xUnit project per service; `Web.Tests` (bUnit); `Web.E2E` (Playwright). `MiroClone.ServiceDefaults.Tests` exists (WP01) | partial |
+| `MiroClone.BoardsService` | Boards and favourites, PostgreSQL `boards`. Skeleton: `/health`, migrations | WP02 (endpoints WP04) |
+| `MiroClone.CanvasService` | Canvas aggregate, JSON snapshot, SignalR `/hubs/canvas`. Skeleton: `/health`, migrations | WP02 (aggregate WP05) |
+| `MiroClone.Web` | Blazor Web App, interactive Server; the BFF. Skeleton: `/` renders Hello | WP02 |
+| `tests/` | One xUnit project per service; `Web.Tests` (bUnit); `Web.E2E` (Playwright, WP07+). `AppHost.Tests`, `BoardsService.Tests`, `CanvasService.Tests`, `ServiceDefaults.Tests` (WP01/WP02) | partial |
 
 ## Build and test
 
@@ -29,6 +29,8 @@ dotnet test MiroClone.sln      # PostgreSQL tests run only with TEST_POSTGRES se
 ```
 
 Run `scripts/install-hooks.sh` once per clone so that secrets are caught before they are committed.
+
+Run the estate for development with `scripts/run-local-stack.sh` (needs a Docker daemon for PostgreSQL).
 
 ## Rules that are easy to break
 

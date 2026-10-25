@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Aspire composition root (P1): one command runs the estate for development. It is not the production topology
+    (P1, P7). The Aspire AppHost SDK supplies the DCP and dashboard paths; its version is pinned in global.json
+    (msbuild-sdks), not here (ADR 0008).
+  -->
+  <Sdk Name="Aspire.AppHost.Sdk" />
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>MiroClone.AppHost</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <!-- Enables the Aspire CLI bundle, which the orchestration features need (ASPIRE010). ADR 0008. -->
+    <AspireUseCliBundle>true</AspireUseCliBundle>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" />
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" />
+  </ItemGroup>
+
+</Project>
