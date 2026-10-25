@@ -22,14 +22,15 @@ public static class ServiceCollectionExtensions
         IConfiguration configuration,
         Action<JwtBearerOptions>? configureBearer = null)
     {
-        services.AddDatabaseContext<CanvasDbContext>(configuration, "canvas");
-        services.AddMigrateOnStartup<CanvasDbContext>();
-
+        // Authentication first: a missing authority must be the first failure, before any other setting is read (WP03).
         services.AddJwtValidation(configuration, options =>
         {
             options.Events = new JwtBearerEvents { OnMessageReceived = ReadHubTokenFromQuery };
             configureBearer?.Invoke(options);
         });
+
+        services.AddDatabaseContext<CanvasDbContext>(configuration, "canvas");
+        services.AddMigrateOnStartup<CanvasDbContext>();
 
         services.AddOptions<CanvasOptions>()
             .Bind(configuration.GetSection(CanvasOptions.SectionName))
@@ -63,7 +64,7 @@ public static class ServiceCollectionExtensions
 
     private const long MaxHubMessageBytes = 128 * 1024;
 
-    /// <summary>Browsers cannot set headers on a websocket, so the hub's token arrives as a query parameter (ADR 0012).</summary>
+    /// <summary>Browsers cannot set headers on a websocket, so the hub's token arrives as a query parameter (ADR 0016).</summary>
     private static Task ReadHubTokenFromQuery(MessageReceivedContext context)
     {
         if (context.Request.Path.StartsWithSegments(CanvasHubMessages.HubPath))

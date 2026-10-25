@@ -39,6 +39,7 @@ public sealed class CanvasSnapshotStoreTests : IAsyncLifetime
         var found = await _store.FindAsync(boardId, TestContext.Current.CancellationToken);
 
         Assert.NotNull(found);
+        Assert.Equal(snapshot.WorkspaceId, found.WorkspaceId);
         Assert.Equal(snapshot.Version, found.Version);
         Assert.Equal(snapshot.Json, found.Json);
         Assert.Equal(snapshot.UpdatedAt.ToUnixTimeMilliseconds(), found.UpdatedAt.ToUnixTimeMilliseconds());
@@ -92,7 +93,7 @@ public sealed class CanvasSnapshotStoreTests : IAsyncLifetime
 
     private static StoredSnapshot Stored(Guid boardId, long version, int layers, DateTimeOffset? at = null)
     {
-        var canvas = BoardCanvas.Empty(boardId);
+        var canvas = BoardCanvas.Empty(boardId, TestTokens.Workspace);
         for (var index = 0; index < layers; index++)
         {
             canvas.Apply(new LayerMutation(
@@ -101,6 +102,6 @@ public sealed class CanvasSnapshotStoreTests : IAsyncLifetime
         }
 
         var json = JsonSerializer.Serialize(canvas.Snapshot() with { Version = version }, CanvasJson.Options);
-        return new StoredSnapshot(boardId, version, at ?? DateTimeOffset.UtcNow, json);
+        return new StoredSnapshot(boardId, TestTokens.Workspace, version, at ?? DateTimeOffset.UtcNow, json);
     }
 }

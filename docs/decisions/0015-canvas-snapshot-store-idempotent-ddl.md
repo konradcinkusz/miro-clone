@@ -14,11 +14,15 @@ timer. The state is opaque to queries: nothing searches inside a layer.
 
 ## Decision
 
-- One table, `canvas_snapshots`: `board_id uuid` (primary key), `version bigint`, `updated_at_ms bigint` and `snapshot text`.
-  `updated_at_ms` is promoted only because rehydrate orders by it (§3). `snapshot` holds the camelCase JSON of `CanvasState`,
-  the same shape REST returns.
+- One table, `canvas_snapshots`: `board_id uuid` (primary key), `workspace_id uuid`, `version bigint`, `updated_at_ms bigint` and
+  `snapshot text`. `updated_at_ms` is promoted only because rehydrate orders by it (§3). `workspace_id` is the single organization
+  the board was created under. It is what a purge is checked against once the board row is gone (ADR 0016). `snapshot` holds the
+  camelCase JSON of `CanvasState`, the same shape REST returns.
 - The DDL is `CREATE TABLE IF NOT EXISTS` and `CREATE INDEX IF NOT EXISTS`, run at startup. It is idempotent and hand-written,
   and the upsert is `INSERT … ON CONFLICT (board_id) DO UPDATE`, safe to repeat (§2).
+- **Schema evolution:** `IF NOT EXISTS` creates a table and never alters one. A later column needs an explicit step, recorded in the
+  ADR that adds it, and the step is provider-specific: `ADD COLUMN IF NOT EXISTS` works on PostgreSQL and not on SQLite. The PostgreSQL
+  test starts from a dropped table for this reason, so it measures the current DDL, not a leftover one.
 - **Why not an EF Core entity model (§6):** the document, not a column set, is the contract, and the layer shape changes with the code
   that writes it. A migration for every field would cost more than the document saves. The `CanvasDbContext` is kept only as the
   connection and the empty migration history that ADR 0009 already runs.

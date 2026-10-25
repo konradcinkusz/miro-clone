@@ -11,7 +11,7 @@ public sealed class BoardCanvasTests
     [Fact]
     public void UpsertAddsTheLayerAndAdvancesTheVersion()
     {
-        var board = BoardCanvas.Empty(Guid.NewGuid());
+        var board = BoardCanvas.Empty(Guid.NewGuid(), TestTokens.Workspace);
         var layer = Rectangle();
 
         var status = board.Apply(new LayerMutation(MutationKind.Upsert, layer));
@@ -26,7 +26,7 @@ public sealed class BoardCanvasTests
     [Fact]
     public void ReplayingTheSameUpsertIsUnchangedAndDoesNotAdvanceTheVersion()
     {
-        var board = BoardCanvas.Empty(Guid.NewGuid());
+        var board = BoardCanvas.Empty(Guid.NewGuid(), TestTokens.Workspace);
         var layer = Rectangle();
         board.Apply(new LayerMutation(MutationKind.Upsert, layer));
 
@@ -41,7 +41,7 @@ public sealed class BoardCanvasTests
     [Fact]
     public void UpsertOfAnExistingLayerReplacesItWholeLastWriterWins()
     {
-        var board = BoardCanvas.Empty(Guid.NewGuid());
+        var board = BoardCanvas.Empty(Guid.NewGuid(), TestTokens.Workspace);
         var id = Guid.NewGuid();
         board.Apply(new LayerMutation(MutationKind.Upsert, Rectangle() with { Id = id, X = 10 }));
 
@@ -56,7 +56,7 @@ public sealed class BoardCanvasTests
     [Fact]
     public void TheHundredAndFirstLayerIsRefusedButExistingLayersStillEdit()
     {
-        var board = BoardCanvas.Empty(Guid.NewGuid());
+        var board = BoardCanvas.Empty(Guid.NewGuid(), TestTokens.Workspace);
         var ids = Enumerable.Range(0, LayerRules.MaxLayers).Select(_ => Guid.NewGuid()).ToList();
         foreach (var id in ids)
         {
@@ -74,7 +74,7 @@ public sealed class BoardCanvasTests
     [Fact]
     public void DeletingAnAbsentLayerIsUnchangedSoADeleteReplayIsHarmless()
     {
-        var board = BoardCanvas.Empty(Guid.NewGuid());
+        var board = BoardCanvas.Empty(Guid.NewGuid(), TestTokens.Workspace);
 
         var status = board.Apply(new LayerMutation(MutationKind.Delete, Id: Guid.NewGuid()));
 
@@ -85,7 +85,7 @@ public sealed class BoardCanvasTests
     [Fact]
     public void DeletingALayerRemovesItFromTheOrder()
     {
-        var board = BoardCanvas.Empty(Guid.NewGuid());
+        var board = BoardCanvas.Empty(Guid.NewGuid(), TestTokens.Workspace);
         var keep = Rectangle();
         var drop = Rectangle();
         board.Apply(new LayerMutation(MutationKind.Upsert, keep));
@@ -102,7 +102,7 @@ public sealed class BoardCanvasTests
     [Fact]
     public void ReorderPutsListedLayersFirstAndKeepsUnlistedOnTop()
     {
-        var board = BoardCanvas.Empty(Guid.NewGuid());
+        var board = BoardCanvas.Empty(Guid.NewGuid(), TestTokens.Workspace);
         var a = Rectangle();
         var b = Rectangle();
         var c = Rectangle();
@@ -120,7 +120,7 @@ public sealed class BoardCanvasTests
     [Fact]
     public void ReorderIgnoresUnknownIdsSoARaceWithADeleteStillConverges()
     {
-        var board = BoardCanvas.Empty(Guid.NewGuid());
+        var board = BoardCanvas.Empty(Guid.NewGuid(), TestTokens.Workspace);
         var a = Rectangle();
         var b = Rectangle();
         board.Apply(new LayerMutation(MutationKind.Upsert, a));
@@ -135,7 +135,7 @@ public sealed class BoardCanvasTests
     [Fact]
     public void ReorderWithDuplicatesIsInvalid()
     {
-        var board = BoardCanvas.Empty(Guid.NewGuid());
+        var board = BoardCanvas.Empty(Guid.NewGuid(), TestTokens.Workspace);
         var a = Rectangle();
         board.Apply(new LayerMutation(MutationKind.Upsert, a));
 
@@ -147,7 +147,7 @@ public sealed class BoardCanvasTests
     [Fact]
     public void MalformedLayersAreRefusedWithoutChangingTheBoard()
     {
-        var board = BoardCanvas.Empty(Guid.NewGuid());
+        var board = BoardCanvas.Empty(Guid.NewGuid(), TestTokens.Workspace);
         var invalid = new[]
         {
             Rectangle() with { X = double.NaN },
@@ -171,7 +171,7 @@ public sealed class BoardCanvasTests
     [Fact]
     public void AnUpsertWithoutALayerIsInvalid()
     {
-        var board = BoardCanvas.Empty(Guid.NewGuid());
+        var board = BoardCanvas.Empty(Guid.NewGuid(), TestTokens.Workspace);
 
         Assert.Equal(MutationStatus.Invalid, board.Apply(new LayerMutation(MutationKind.Upsert)));
     }
@@ -187,7 +187,7 @@ public sealed class BoardCanvasTests
             LayerIds: [bottom.Id, top.Id],
             Layers: new Dictionary<Guid, Layer> { [top.Id] = top, [bottom.Id] = bottom });
 
-        var restored = BoardCanvas.Restore(boardId, state);
+        var restored = BoardCanvas.Restore(boardId, Guid.NewGuid(), state);
 
         Assert.Equal(7, restored.Version);
         Assert.Equal([bottom.Id, top.Id], restored.Snapshot().LayerIds);
@@ -199,7 +199,7 @@ public sealed class BoardCanvasTests
         var layers = Enumerable.Range(0, LayerRules.MaxLayers + 1).Select(_ => Rectangle()).ToList();
         var state = new CanvasState(1, layers.Select(layer => layer.Id).ToList(), layers.ToDictionary(layer => layer.Id));
 
-        Assert.Throws<InvalidOperationException>(() => BoardCanvas.Restore(Guid.NewGuid(), state));
+        Assert.Throws<InvalidOperationException>(() => BoardCanvas.Restore(Guid.NewGuid(), Guid.NewGuid(), state));
     }
 
     private static Layer Rectangle() => new(Guid.NewGuid(), LayerType.Rectangle, 0, 0, 10, 10, Blue);

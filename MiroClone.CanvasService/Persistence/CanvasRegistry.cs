@@ -8,6 +8,19 @@ namespace MiroClone.CanvasService.Persistence;
 /// <summary>A board's canvas could not be read from the store. The caller answers "unavailable", never "empty".</summary>
 public sealed class CanvasStoreUnavailableException(string message, Exception? inner = null) : Exception(message, inner);
 
+/// <summary>What a purge did. <see cref="NotOwned"/> is refused the same way a missing board is, so it never reveals another workspace's board.</summary>
+public enum PurgeOutcome
+{
+    /// <summary>The snapshot belonged to the caller's workspace and is gone from memory and from the store.</summary>
+    Purged,
+
+    /// <summary>No snapshot exists for the board. Purging nothing succeeds, so a retry is harmless.</summary>
+    NothingStored,
+
+    /// <summary>The snapshot belongs to another workspace. Nothing was touched.</summary>
+    NotOwned,
+}
+
 /// <summary>
 /// Holds every loaded board in memory, marks them dirty on change, and flushes the dirty ones to the store on a timer
 /// (state-snapshot-persistence §1). The hot path only touches memory. A failed write re-queues its board, and a failed
@@ -85,10 +98,11 @@ public sealed partial class CanvasRegistry(
     }
 
     /// <summary>
-    /// The board's canvas, loaded from the store on first use. A read that fails throws rather than returning an empty
-    /// board: an empty board would be flushed over the stored one on the next tick.
+    /// The board's canvas, loaded from the store on first use. A new board is recorded under <paramref name="workspaceId"/>,
+    /// the caller's workspace, which the caller has already been checked to belong to. A read that fails throws rather than
+    /// returning an empty board: an empty board would be flushed over the stored one on the next tick.
     /// </summary>
-    public async Task<BoardCanvas> GetOrLoadAsync(Guid boardId, CancellationToken cancellationToken)
+    public async Task<BoardCanvas> GetOrLoadAsync(Guid boardId, Guid workspaceId, CancellationToken cancellationToken)
     {
         if (TryGet(boardId) is { } cached)
         {
@@ -99,7 +113,7 @@ public sealed partial class CanvasRegistry(
         try
         {
             var stored = await store.FindAsync(boardId, cancellationToken);
-            loaded = stored is null ? BoardCanvas.Empty(boardId) : Restore(stored);
+            loaded = stored is null ? BoardCanvas.Empty(boardId, workspaceId) : Restore(stored);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -150,6 +164,37 @@ public sealed partial class CanvasRegistry(
         {
             _storeGate.Release();
         }
+    }
+
+    /// <summary>
+    /// Purges a board's snapshot if the caller's workspace owns it. Ownership is the workspace recorded with the snapshot, so
+    /// the purge works after the board row is deleted, which is when BoardsService calls it (ADR 0016).
+    /// </summary>
+    public async Task<PurgeOutcome> PurgeAsync(Guid boardId, Guid callerWorkspace, CancellationToken cancellationToken)
+    {
+        Guid? owner;
+        try
+        {
+            owner = TryGet(boardId)?.WorkspaceId ?? (await store.FindAsync(boardId, cancellationToken))?.WorkspaceId;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            RecordFailure("purge lookup", ex);
+            throw new CanvasStoreUnavailableException($"Canvas {boardId} could not be looked up.", ex);
+        }
+
+        if (owner is null)
+        {
+            return PurgeOutcome.NothingStored;
+        }
+
+        if (owner != callerWorkspace)
+        {
+            return PurgeOutcome.NotOwned;
+        }
+
+        await RemoveAsync(boardId, cancellationToken);
+        return PurgeOutcome.Purged;
     }
 
     /// <summary>
@@ -226,7 +271,9 @@ public sealed partial class CanvasRegistry(
 
         var state = canvas.Snapshot();
         var json = JsonSerializer.Serialize(state, CanvasJson.Options);
-        await store.UpsertAsync(new StoredSnapshot(boardId, state.Version, DateTimeOffset.UtcNow, json), cancellationToken);
+        await store.UpsertAsync(
+            new StoredSnapshot(boardId, canvas.WorkspaceId, state.Version, DateTimeOffset.UtcNow, json),
+            cancellationToken);
         RecordSuccess();
     }
 
@@ -258,7 +305,7 @@ public sealed partial class CanvasRegistry(
     {
         var state = JsonSerializer.Deserialize<CanvasState>(snapshot.Json, CanvasJson.Options)
             ?? throw new InvalidOperationException($"Stored canvas {snapshot.BoardId} is empty.");
-        return BoardCanvas.Restore(snapshot.BoardId, state);
+        return BoardCanvas.Restore(snapshot.BoardId, snapshot.WorkspaceId, state);
     }
 
     private void RecordSuccess()

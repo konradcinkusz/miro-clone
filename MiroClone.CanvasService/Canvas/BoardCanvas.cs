@@ -14,31 +14,38 @@ public sealed class BoardCanvas
     private readonly Dictionary<Guid, Layer> _layers = [];
     private readonly List<Guid> _order = [];
 
-    private BoardCanvas(Guid boardId, long version)
+    private BoardCanvas(Guid boardId, Guid workspaceId, long version)
     {
         BoardId = boardId;
+        WorkspaceId = workspaceId;
         Version = version;
     }
 
     public Guid BoardId { get; }
+
+    /// <summary>
+    /// The workspace (authservice organization) the board belongs to. Recorded with the snapshot so a purge can be checked
+    /// against its owner after the board row is gone (ADR 0016).
+    /// </summary>
+    public Guid WorkspaceId { get; }
 
     /// <summary>Serialises hub broadcasts and joins for this board. Acquire before applying a mutation and broadcasting it.</summary>
     public SemaphoreSlim Gate { get; } = new(1, 1);
 
     public long Version { get; private set; }
 
-    public static BoardCanvas Empty(Guid boardId) => new(boardId, version: 0);
+    public static BoardCanvas Empty(Guid boardId, Guid workspaceId) => new(boardId, workspaceId, version: 0);
 
     /// <summary>Rebuilds the aggregate from a stored state, keeping only the layers the order names.</summary>
     /// <exception cref="InvalidOperationException">The state holds more layers than the board allows.</exception>
-    public static BoardCanvas Restore(Guid boardId, CanvasState state)
+    public static BoardCanvas Restore(Guid boardId, Guid workspaceId, CanvasState state)
     {
         if (state.LayerIds.Count > LayerRules.MaxLayers)
         {
             throw new InvalidOperationException($"Stored canvas {boardId} holds {state.LayerIds.Count} layers, above the limit.");
         }
 
-        var canvas = new BoardCanvas(boardId, state.Version);
+        var canvas = new BoardCanvas(boardId, workspaceId, state.Version);
         foreach (var id in state.LayerIds)
         {
             if (state.Layers.TryGetValue(id, out var layer) && canvas._layers.TryAdd(id, layer))

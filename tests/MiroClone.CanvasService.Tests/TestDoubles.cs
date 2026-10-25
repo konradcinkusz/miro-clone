@@ -1,53 +1,31 @@
-using System.Security.Claims;
-using System.Security.Cryptography;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
 using Microsoft.IdentityModel.JsonWebTokens;
-using Microsoft.IdentityModel.Protocols;
-using Microsoft.IdentityModel.Protocols.OpenIdConnect;
-using Microsoft.IdentityModel.Tokens;
+using MiroClone.TestSupport;
 using MiroClone.CanvasService.Boards;
 using MiroClone.CanvasService.Persistence;
 
 namespace MiroClone.CanvasService.Tests;
 
 /// <summary>
-/// Issues RS256 tokens from one generated key, and serves that key through a static configuration manager, so the
-/// JWT path runs with no authority and no network (ADR 0007).
+/// Tokens for the canvas tests, signed by the shared test authority (WP03), so the real JWKS path runs with no network. A user
+/// belongs to one workspace unless a test issues several organisations, which is how authservice mints a membership.
 /// </summary>
 internal static class TestTokens
 {
-    public const string Authority = "https://auth.test";
-    public const string Audience = "miro-clone-canvas";
-    private const string KeyId = "canvas-test-key";
+    /// <summary>The one audience every estate token carries (docs/decisions/0011-authservice-adoption-and-token-contract.md).</summary>
+    public const string Audience = "miro-clone";
 
-    private static readonly RSA SigningKey = RSA.Create(2048);
+    /// <summary>The workspace most tests act in.</summary>
+    public static readonly Guid Workspace = Guid.NewGuid();
 
-    public static void ConfigureBearer(JwtBearerOptions options)
-    {
-        var configuration = new OpenIdConnectConfiguration { Issuer = Authority };
-        configuration.SigningKeys.Add(new RsaSecurityKey(SigningKey.ExportParameters(includePrivateParameters: false))
-        {
-            KeyId = KeyId,
-        });
-        options.ConfigurationManager = new StaticConfigurationManager<OpenIdConnectConfiguration>(configuration);
-    }
+    /// <summary>One authority for the test run, started on first use and kept for the run.</summary>
+    public static readonly Task<TestAuthority> Authority = TestAuthority.StartAsync();
 
-    public static string Issue(Guid userId, string name = "Ada", string audience = Audience)
-    {
-        var descriptor = new SecurityTokenDescriptor
-        {
-            Issuer = Authority,
-            Audience = audience,
-            Expires = DateTime.UtcNow.AddMinutes(10),
-            Subject = new ClaimsIdentity([new Claim("sub", userId.ToString("D")), new Claim("name", name)]),
-            SigningCredentials = new SigningCredentials(
-                new RsaSecurityKey(SigningKey) { KeyId = KeyId },
-                SecurityAlgorithms.RsaSha256),
-        };
+    public static string Issue(Guid userId, Guid? workspace = null, string audience = Audience) =>
+        Authority.Result.IssueToken(audience, userId, [workspace ?? Workspace], DateTime.UtcNow.AddMinutes(10));
 
-        return new JsonWebTokenHandler().CreateToken(descriptor);
-    }
+    public static string IssueForOrganizations(Guid userId, params Guid[] organizationIds) =>
+        Authority.Result.IssueToken(Audience, userId, organizationIds, DateTime.UtcNow.AddMinutes(10));
 }
 
 /// <summary>

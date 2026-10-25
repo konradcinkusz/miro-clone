@@ -8,7 +8,10 @@ using MiroClone.ServiceDefaults;
 
 namespace MiroClone.CanvasService.Api;
 
-/// <summary>The REST surface: read a board's canvas, purge it. Every route needs a token and a board the caller may see.</summary>
+/// <summary>
+/// The REST surface: read a board's canvas, and purge it. A read needs a token, a single organization and a board the caller may
+/// see. A purge needs the caller's organization to own the snapshot, so it works after the board row is deleted (ADR 0016).
+/// </summary>
 public static class CanvasEndpoints
 {
     public const string GetCanvasName = "GetCanvas";
@@ -32,6 +35,11 @@ public static class CanvasEndpoints
         CanvasRegistry registry,
         CancellationToken cancellationToken)
     {
+        if (WorkspaceClaims.WorkspaceId(http.User) is not { } workspace)
+        {
+            return Results.NotFound();
+        }
+
         var access = await CheckAccessAsync(boardId, http, boards, cancellationToken);
         if (access is not null)
         {
@@ -40,7 +48,7 @@ public static class CanvasEndpoints
 
         try
         {
-            var canvas = await registry.GetOrLoadAsync(boardId, cancellationToken);
+            var canvas = await registry.GetOrLoadAsync(boardId, workspace, cancellationToken);
             return Results.Json(canvas.Snapshot(), CanvasJson.Options);
         }
         catch (CanvasStoreUnavailableException)
@@ -50,25 +58,32 @@ public static class CanvasEndpoints
     }
 
     /// <summary>
-    /// Purges the board's canvas. The caller must still be allowed to see the board, so this cannot be used to purge another
-    /// workspace's canvas. BoardsService calls it after deleting a board (ADR 0012 records what that means in practice).
+    /// Purges the board's snapshot when the caller's organization owns it. A snapshot of another workspace answers 404, the same as
+    /// a missing board. A board with no stored snapshot answers 204, so a retry from BoardsService is harmless.
     /// </summary>
     private static async Task<IResult> DeleteCanvasAsync(
         Guid boardId,
         HttpContext http,
-        IBoardAccess boards,
         CanvasRegistry registry,
         CancellationToken cancellationToken)
     {
-        var access = await CheckAccessAsync(boardId, http, boards, cancellationToken);
-        if (access is not null)
+        if (WorkspaceClaims.WorkspaceId(http.User) is not { } workspace)
         {
-            return access;
+            return Results.NotFound();
         }
 
-        // A failed store delete is retried on each tick by the registry. The board is gone from memory either way.
-        await registry.RemoveAsync(boardId, cancellationToken);
-        return Results.NoContent();
+        try
+        {
+            return await registry.PurgeAsync(boardId, workspace, cancellationToken) switch
+            {
+                PurgeOutcome.NotOwned => Results.NotFound(),
+                _ => Results.NoContent(),
+            };
+        }
+        catch (CanvasStoreUnavailableException)
+        {
+            return Results.Problem(title: "Canvas store unavailable.", statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
     }
 
     /// <summary>Null when the caller may see the board; otherwise the answer to return. A non-member gets 404, never 403.</summary>

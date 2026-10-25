@@ -20,7 +20,7 @@ public sealed class CanvasRegistryTests
     {
         var registry = NewRegistry();
         var boardId = Guid.NewGuid();
-        var canvas = await registry.GetOrLoadAsync(boardId, TestContext.Current.CancellationToken);
+        var canvas = await registry.GetOrLoadAsync(boardId, TestTokens.Workspace, TestContext.Current.CancellationToken);
         canvas.Apply(Upsert(Guid.NewGuid()));
         registry.MarkDirty(boardId);
 
@@ -38,7 +38,7 @@ public sealed class CanvasRegistryTests
     {
         var registry = NewRegistry();
         var boardId = Guid.NewGuid();
-        var canvas = await registry.GetOrLoadAsync(boardId, TestContext.Current.CancellationToken);
+        var canvas = await registry.GetOrLoadAsync(boardId, TestTokens.Workspace, TestContext.Current.CancellationToken);
         canvas.Apply(Upsert(Guid.NewGuid()));
         registry.MarkDirty(boardId);
         _store.Offline = true;
@@ -60,7 +60,7 @@ public sealed class CanvasRegistryTests
     {
         var registry = NewRegistry();
         var boardId = Guid.NewGuid();
-        var canvas = await registry.GetOrLoadAsync(boardId, TestContext.Current.CancellationToken);
+        var canvas = await registry.GetOrLoadAsync(boardId, TestTokens.Workspace, TestContext.Current.CancellationToken);
         canvas.Apply(Upsert(Guid.NewGuid()));
         registry.MarkDirty(boardId);
         await registry.FlushAsync(TestContext.Current.CancellationToken);
@@ -78,7 +78,7 @@ public sealed class CanvasRegistryTests
     {
         var registry = NewRegistry();
         var boardId = Guid.NewGuid();
-        var canvas = await registry.GetOrLoadAsync(boardId, TestContext.Current.CancellationToken);
+        var canvas = await registry.GetOrLoadAsync(boardId, TestTokens.Workspace, TestContext.Current.CancellationToken);
         canvas.Apply(Upsert(Guid.NewGuid()));
         registry.MarkDirty(boardId);
         await registry.FlushAsync(TestContext.Current.CancellationToken);
@@ -102,11 +102,11 @@ public sealed class CanvasRegistryTests
         _store.Offline = true;
 
         await Assert.ThrowsAsync<CanvasStoreUnavailableException>(
-            () => registry.GetOrLoadAsync(boardId, TestContext.Current.CancellationToken));
+            () => registry.GetOrLoadAsync(boardId, TestTokens.Workspace, TestContext.Current.CancellationToken));
         Assert.Null(registry.TryGet(boardId));
 
         _store.Offline = false;
-        var loaded = await registry.GetOrLoadAsync(boardId, TestContext.Current.CancellationToken);
+        var loaded = await registry.GetOrLoadAsync(boardId, TestTokens.Workspace, TestContext.Current.CancellationToken);
         Assert.Single(loaded.Snapshot().LayerIds);
     }
 
@@ -136,7 +136,7 @@ public sealed class CanvasRegistryTests
         Assert.False(registry.IsPersisting);
         var board = Guid.NewGuid();
         _store.Offline = false;
-        var canvas = await registry.GetOrLoadAsync(board, TestContext.Current.CancellationToken);
+        var canvas = await registry.GetOrLoadAsync(board, TestTokens.Workspace, TestContext.Current.CancellationToken);
         Assert.Equal(MutationStatus.Changed, canvas.Apply(Upsert(Guid.NewGuid())));
     }
 
@@ -151,9 +151,9 @@ public sealed class CanvasRegistryTests
 
     private static StoredSnapshot BoardWithOneLayer(Guid boardId)
     {
-        var canvas = BoardCanvas.Empty(boardId);
+        var canvas = BoardCanvas.Empty(boardId, TestTokens.Workspace);
         canvas.Apply(Upsert(Guid.NewGuid()));
         var json = JsonSerializer.Serialize(canvas.Snapshot(), CanvasJson.Options);
-        return new StoredSnapshot(boardId, canvas.Version, DateTimeOffset.UtcNow, json);
+        return new StoredSnapshot(boardId, TestTokens.Workspace, canvas.Version, DateTimeOffset.UtcNow, json);
     }
 }

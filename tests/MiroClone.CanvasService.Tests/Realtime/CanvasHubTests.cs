@@ -133,8 +133,8 @@ public sealed class CanvasHubTests : IAsyncLifetime
     [Fact]
     public async Task PresenceIdentityIsStampedFromTheTokenNotTheClient()
     {
-        var ada = await MemberAsync("Ada");
-        var grace = await MemberAsync("Grace");
+        var ada = await MemberAsync();
+        var grace = await MemberAsync();
         await JoinAsync(grace);
         var seen = ListenFor<Presence>(grace, CanvasHubMessages.PresenceUpdated, presence => presence.Cursor == new Point(1, 2));
         await JoinAsync(ada);
@@ -147,7 +147,9 @@ public sealed class CanvasHubTests : IAsyncLifetime
 
         var presence = await seen.Task.WaitAsync(Patience, TestContext.Current.CancellationToken);
         Assert.Equal(_usersByConnection[ada], presence.UserId);
-        Assert.Equal("Ada", presence.Name);
+        // authservice issues no name claim, so the label is "Member" and the first four hex digits of the user id.
+        Assert.StartsWith("Member ", presence.Name, StringComparison.Ordinal);
+        Assert.DoesNotContain("Mallory", presence.Name, StringComparison.Ordinal);
         Assert.NotEqual("#000000", presence.Color);
     }
 
@@ -218,21 +220,21 @@ public sealed class CanvasHubTests : IAsyncLifetime
     private static Layer Rectangle() => new(Guid.NewGuid(), LayerType.Rectangle, 0, 0, 10, 10, new Rgb(37, 99, 235));
 
     /// <summary>A connected caller whose user is granted the test board.</summary>
-    private async Task<HubConnection> MemberAsync(string name = "Ada")
+    private async Task<HubConnection> MemberAsync()
     {
         var user = Guid.NewGuid();
         _boards.Grant(user, _board);
-        return await ConnectAsync(user, name);
+        return await ConnectAsync(user);
     }
 
-    private async Task<HubConnection> ConnectAsync(Guid userId, string name = "Ada")
+    private async Task<HubConnection> ConnectAsync(Guid userId)
     {
         var server = _app.GetTestServer();
         var connection = new HubConnectionBuilder()
             .WithUrl(new Uri(server.BaseAddress, CanvasHubMessages.HubPath), options =>
             {
                 options.HttpMessageHandlerFactory = _ => server.CreateHandler();
-                options.AccessTokenProvider = () => Task.FromResult<string?>(TestTokens.Issue(userId, name));
+                options.AccessTokenProvider = () => Task.FromResult<string?>(TestTokens.Issue(userId));
                 options.Transports = HttpTransportType.LongPolling;
             })
             .AddJsonProtocol(json => json.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()))

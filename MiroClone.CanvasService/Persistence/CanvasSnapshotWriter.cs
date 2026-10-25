@@ -12,7 +12,7 @@ namespace MiroClone.CanvasService.Persistence;
 /// This is a plain <see cref="IHostedService"/> rather than a <c>BackgroundService</c> on purpose. The loop is owned here and
 /// the final flush runs inside <see cref="StopAsync"/>, which the host always awaits. A <c>BackgroundService</c>'s final flush
 /// depends on its <c>ExecuteAsync</c> having started; measured under parallel test hosts, that did not always happen, and a
-/// clean stop then lost the last interval of edits (ADR 0011).
+/// clean stop then lost the last interval of edits (ADR 0015).
 /// </remarks>
 internal sealed partial class CanvasSnapshotWriter(
     CanvasRegistry registry,

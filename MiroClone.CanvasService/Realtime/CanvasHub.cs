@@ -156,7 +156,10 @@ public sealed partial class CanvasHub(
                 throw new HubException(CanvasHubMessages.NotFound);
             }
 
-            return await registry.GetOrLoadAsync(boardId, Context.ConnectionAborted);
+            var workspace = Context.User is { } user && WorkspaceClaims.WorkspaceId(user) is { } active
+                ? active
+                : throw new HubException(CanvasHubMessages.NotFound);
+            return await registry.GetOrLoadAsync(boardId, workspace, Context.ConnectionAborted);
         }
         catch (BoardsServiceException ex)
         {
@@ -197,10 +200,12 @@ public sealed partial class CanvasHub(
             throw new HubException(CanvasHubMessages.Unauthenticated);
         }
 
+        // authservice issues no name claim (docs/decisions/0011-authservice-adoption-and-token-contract.md), so a participant is labelled from the user id. An email address is
+        // never shown to other participants.
         var name = user.FindFirst("name")?.Value?.Trim();
         return new Presence(
             id,
-            string.IsNullOrWhiteSpace(name) ? "Member" : name[..Math.Min(name.Length, MaxNameLength)],
+            string.IsNullOrWhiteSpace(name) ? $"Member {id:N}"[..MemberLabelLength] : name[..Math.Min(name.Length, MaxNameLength)],
             PresenceColors.For(id),
             cursor,
             selection);
@@ -209,6 +214,9 @@ public sealed partial class CanvasHub(
     private static string GroupName(Guid boardId) => $"board:{boardId:D}";
 
     private const int MaxNameLength = 64;
+
+    /// <summary>"Member " plus the first four hex digits of the user id: stable, and enough to tell two participants apart.</summary>
+    private const int MemberLabelLength = 11;
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Joining board {BoardId} is unavailable: {Error}")]
     private static partial void LogJoinDegraded(ILogger logger, Guid boardId, string error);

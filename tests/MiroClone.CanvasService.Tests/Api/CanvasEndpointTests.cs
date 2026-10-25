@@ -68,7 +68,7 @@ public sealed class CanvasEndpointTests : IAsyncLifetime
     public async Task ATokenForAnotherServiceIsRefused()
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/canvas/{_board:D}");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", TestTokens.Issue(_member, audience: "miro-clone-boards"));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", TestTokens.Issue(_member, audience: "another-product"));
 
         var response = await _client.SendAsync(request, TestContext.Current.CancellationToken);
 
@@ -101,7 +101,7 @@ public sealed class CanvasEndpointTests : IAsyncLifetime
     public async Task AMemberPurgesTheBoardAndItsSnapshotIsDeleted()
     {
         var registry = _app.Services.GetRequiredService<CanvasRegistry>();
-        var canvas = await registry.GetOrLoadAsync(_board, TestContext.Current.CancellationToken);
+        var canvas = await registry.GetOrLoadAsync(_board, TestTokens.Workspace, TestContext.Current.CancellationToken);
         canvas.Apply(new LayerMutation(MutationKind.Upsert, new Layer(Guid.NewGuid(), LayerType.Ellipse, 0, 0, 1, 1, new Rgb(0, 0, 0))));
         registry.MarkDirty(_board);
         await registry.FlushAsync(TestContext.Current.CancellationToken);
@@ -116,17 +116,60 @@ public sealed class CanvasEndpointTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ANonMemberCannotPurgeAnotherWorkspacesCanvas()
+    public async Task AnotherWorkspaceCannotPurgeTheCanvas()
     {
         var registry = _app.Services.GetRequiredService<CanvasRegistry>();
-        await registry.GetOrLoadAsync(_board, TestContext.Current.CancellationToken);
+        await registry.GetOrLoadAsync(_board, TestTokens.Workspace, TestContext.Current.CancellationToken);
         using var request = new HttpRequestMessage(HttpMethod.Delete, $"/api/canvas/{_board:D}");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", TestTokens.Issue(Guid.NewGuid()));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", TestTokens.Issue(Guid.NewGuid(), Guid.NewGuid()));
 
         var response = await _client.SendAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.NotNull(registry.TryGet(_board));
+    }
+
+    [Fact]
+    public async Task TheOwningWorkspacePurgesADeletedBoardWithoutAskingBoardsService()
+    {
+        // BoardsService has already deleted the board, so its access check would answer 404 and fail. The purge must not need it.
+        var registry = _app.Services.GetRequiredService<CanvasRegistry>();
+        var canvas = await registry.GetOrLoadAsync(_board, TestTokens.Workspace, TestContext.Current.CancellationToken);
+        canvas.Apply(new LayerMutation(MutationKind.Upsert, new Layer(Guid.NewGuid(), LayerType.Ellipse, 0, 0, 1, 1, new Rgb(0, 0, 0))));
+        registry.MarkDirty(_board);
+        await registry.FlushAsync(TestContext.Current.CancellationToken);
+        _app.Services.GetRequiredService<FakeBoardAccess>().Unavailable = true;
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"/api/canvas/{_board:D}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", TestTokens.Issue(_member));
+
+        var response = await _client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Null(_app.Services.GetRequiredService<FakeSnapshotStore>().Row(_board));
+    }
+
+    [Fact]
+    public async Task PurgingABoardWithNoStoredSnapshotIsNoContent()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"/api/canvas/{_otherBoard:D}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", TestTokens.Issue(_member));
+
+        var response = await _client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ATokenWithTwoOrganizationsHasNoActiveWorkspaceAndIsRefused()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/canvas/{_board:D}");
+        request.Headers.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            TestTokens.IssueForOrganizations(_member, TestTokens.Workspace, Guid.NewGuid()));
+
+        var response = await _client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     private static HttpRequestMessage Get(Guid boardId, Guid userId)

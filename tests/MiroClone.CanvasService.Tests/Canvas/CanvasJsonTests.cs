@@ -10,7 +10,7 @@ public sealed class CanvasJsonTests
     [Fact]
     public void EveryLayerTypeRoundTripsThroughTheSharedOptions()
     {
-        var board = BoardCanvas.Empty(Guid.NewGuid());
+        var board = BoardCanvas.Empty(Guid.NewGuid(), TestTokens.Workspace);
         var layers = new[]
         {
             new Layer(Guid.NewGuid(), LayerType.Rectangle, 1, 2, 3, 4, new Rgb(1, 2, 3)),

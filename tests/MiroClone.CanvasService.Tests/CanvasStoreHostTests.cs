@@ -36,7 +36,7 @@ public sealed class CanvasStoreHostTests : IAsyncLifetime
         await using (var first = await StartAsync(ServiceHost.SqliteFile(_databaseFile), realStore: true))
         {
             var registry = first.Services.GetRequiredService<CanvasRegistry>();
-            var canvas = await registry.GetOrLoadAsync(_board, TestContext.Current.CancellationToken);
+            var canvas = await registry.GetOrLoadAsync(_board, TestTokens.Workspace, TestContext.Current.CancellationToken);
             canvas.Apply(new LayerMutation(MutationKind.Upsert, layer));
             registry.MarkDirty(_board);
 
@@ -64,7 +64,7 @@ public sealed class CanvasStoreHostTests : IAsyncLifetime
     {
         await using var app = await StartAsync(new Dictionary<string, string?>());
         var registry = app.Services.GetRequiredService<CanvasRegistry>();
-        var canvas = await registry.GetOrLoadAsync(_board, TestContext.Current.CancellationToken);
+        var canvas = await registry.GetOrLoadAsync(_board, TestTokens.Workspace, TestContext.Current.CancellationToken);
         canvas.Apply(new LayerMutation(MutationKind.Upsert, new Layer(Guid.NewGuid(), LayerType.Rectangle, 0, 0, 1, 1, new Rgb(0, 0, 0))));
         registry.MarkDirty(_board);
         app.Services.GetRequiredService<FakeSnapshotStore>().Offline = true;

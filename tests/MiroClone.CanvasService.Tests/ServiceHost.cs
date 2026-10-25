@@ -8,12 +8,14 @@ using MiroClone.CanvasService.Boards;
 using MiroClone.CanvasService.Persistence;
 using MiroClone.CanvasService.Realtime;
 using MiroClone.ServiceDefaults;
+using MiroClone.TestSupport;
 
 namespace MiroClone.CanvasService.Tests;
 
 /// <summary>
 /// Builds the service's wiring as Program.cs does, on TestServer, so no socket is opened and no test needs the network.
-/// Kept in step with Program.cs by review: a change to one is a change to the other. Authentication uses the test key.
+/// Kept in step with Program.cs by review: a change to one is a change to the other. Tokens are validated through the shared
+/// test authority's JWKS, as in production.
 /// BoardsService and the snapshot store are fakes (<see cref="FakeBoardAccess"/>, <see cref="FakeSnapshotStore"/>) unless a
 /// test asks for the real store, which needs a relational database such as SQLite.
 /// </summary>
@@ -24,12 +26,12 @@ internal static class ServiceHost
         bool realSnapshotStore = false,
         Action<IServiceCollection>? configure = null)
     {
+        var authority = await TestTokens.Authority;
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["Auth:Authority"] = TestTokens.Authority,
-            ["Auth:Issuer"] = TestTokens.Authority,
+            ["Auth:Authority"] = TestAuthority.Issuer,
             ["Auth:Audience"] = TestTokens.Audience,
             ["Database:Provider"] = "InMemory",
             ["Canvas:FlushInterval"] = "00:01:00",
@@ -37,7 +39,7 @@ internal static class ServiceHost
         builder.Configuration.AddInMemoryCollection(settings);
         builder.AddServiceDefaults();
         builder.Services.AddOriginGuard(builder.Configuration);
-        builder.Services.AddCanvasService(builder.Configuration, TestTokens.ConfigureBearer);
+        builder.Services.AddCanvasService(builder.Configuration, options => options.BackchannelHttpHandler = authority.Backchannel);
 
         builder.Services.AddSingleton<FakeBoardAccess>();
         builder.Services.Replace(ServiceDescriptor.Singleton<IBoardAccess>(sp => sp.GetRequiredService<FakeBoardAccess>()));
