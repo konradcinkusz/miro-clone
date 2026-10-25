@@ -5,7 +5,6 @@ using MiroClone.ServiceDefaults;
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.Services.AddOriginGuard(builder.Configuration);
-builder.Services.AddJwtValidation(builder.Configuration);
 builder.Services.AddStandardRateLimiting(builder.Configuration);
 builder.Services.AddBoardsService(builder.Configuration);
 
@@ -15,5 +14,6 @@ app.UseAuthentication();
 app.UseRateLimiter();
 app.UseAuthorization();
 app.MapDefaultEndpoints();
+app.MapSessionEndpoints();
 app.MapBoardEndpoints();
 app.Run();

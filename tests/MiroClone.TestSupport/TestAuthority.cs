@@ -1,22 +1,20 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 
-namespace MiroClone.BoardsService.Tests;
+namespace MiroClone.TestSupport;
 
 /// <summary>
 /// A local authservice stand-in: serves an OIDC discovery document and a JWKS built from a freshly generated RSA key.
-/// The API under test fetches both through its backchannel, so the real JWKS path runs. Same shape as the kernel's
-/// test authority (tests/MiroClone.ServiceDefaults.Tests/TestApps.cs), copied because test projects do not share code.
+/// The API under test fetches both through its backchannel, so the real JWKS path is exercised (ADR 0007).
 /// </summary>
-internal sealed class TestAuthority : IAsyncDisposable
+public sealed class TestAuthority : IAsyncDisposable
 {
     public const string Issuer = "https://auth.test";
-    private const string KeyId = "test-key-1";
+    public const string KeyId = "test-key-1";
 
     private readonly WebApplication _app;
 
@@ -55,30 +53,9 @@ internal sealed class TestAuthority : IAsyncDisposable
         return new TestAuthority(app, signingKey);
     }
 
-    /// <summary>Signs an RS256 token with this authority's key. A null workspace produces a token with no active workspace.</summary>
-    public string IssueToken(Guid userId, Guid? workspaceId, string? name = null, DateTime? expiresUtc = null)
-    {
-        var claims = new List<Claim> { new("sub", userId.ToString()) };
-        if (workspaceId is { } workspace)
-        {
-            claims.Add(new Claim("workspace", workspace.ToString()));
-        }
-
-        if (name is not null)
-        {
-            claims.Add(new Claim("name", name));
-        }
-
-        var credentials = new SigningCredentials(new RsaSecurityKey(SigningKey) { KeyId = KeyId }, SecurityAlgorithms.RsaSha256);
-        var token = new JwtSecurityToken(
-            Issuer,
-            ServiceHost.Audience,
-            claims,
-            notBefore: null,
-            expires: expiresUtc ?? DateTime.UtcNow.AddMinutes(5),
-            signingCredentials: credentials);
-        return new JwtSecurityTokenHandler().WriteToken(token);
-    }
+    /// <summary>Signs a token with this authority's key, so the JWKS entry matches it.</summary>
+    public string IssueToken(string audience, Guid userId, IEnumerable<Guid> organizationIds, DateTime expiresUtc) =>
+        TokenFactory.Rs256(SigningKey, KeyId, Issuer, audience, userId, organizationIds, expiresUtc);
 
     public async ValueTask DisposeAsync()
     {

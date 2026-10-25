@@ -22,17 +22,18 @@ public sealed class EstateWiringTests
     }
 
     [Fact]
-    public void EstateDeclaresPostgreSqlWithOneDatabasePerDataService()
+    public void EstateDeclaresPostgreSqlWithOneDatabasePerService()
     {
         var names = BuildModel().Resources.Select(resource => resource.Name).ToArray();
 
         Assert.Contains("postgres", names);
         Assert.Contains("boards", names);
         Assert.Contains("canvas", names);
+        Assert.Contains("authservice", names);
     }
 
     [Fact]
-    public void EveryServiceAndTheWebAppIsDeclaredAsAProjectWhoseFileExists()
+    public void EveryMiroCloneServiceAndTheWebAppIsDeclaredAsAProjectWhoseFileExists()
     {
         var projects = BuildModel().Resources.OfType<ProjectResource>().ToArray();
 
@@ -45,15 +46,27 @@ public sealed class EstateWiringTests
     }
 
     [Fact]
-    public void EachDataServiceWaitsForItsOwnDatabaseAndTheWebAppWaitsForBothServices()
+    public void AuthServiceIsThePinnedReleaseImageNotABuiltProject()
+    {
+        var authService = BuildModel().Resources.OfType<ContainerResource>().Single(resource => resource.Name == "authservice");
+
+        var image = authService.Annotations.OfType<ContainerImageAnnotation>().Single();
+        Assert.Equal("ghcr.io", image.Registry);
+        Assert.Equal("konradcinkusz/authservice", image.Image);
+        Assert.Equal("v0.3.4", image.Tag);
+    }
+
+    [Fact]
+    public void EachDataServiceWaitsForItsOwnDatabaseAndAuthServiceAndTheWebAppWaitsForBothServices()
     {
         // Aspire adds the hosting server to a database reference's waits, so a data service waits for its database
-        // and for the PostgreSQL server that holds it. No service waits for the other service's database.
+        // and for the PostgreSQL server that holds it. No service waits for another service's database.
         var resources = BuildModel().Resources.ToDictionary(resource => resource.Name);
 
-        Assert.Equal(["boards", "postgres"], WaitsFor(resources["boards-service"]).Order());
-        Assert.Equal(["canvas", "postgres"], WaitsFor(resources["canvas-service"]).Order());
-        Assert.Equal(["boards-service", "canvas-service"], WaitsFor(resources["web"]).Order());
+        Assert.Equal(["authservice", "boards", "postgres"], WaitsFor(resources["boards-service"]).Order());
+        Assert.Equal(["authservice", "canvas", "postgres"], WaitsFor(resources["canvas-service"]).Order());
+        Assert.Equal(["authservice", "boards-service", "canvas-service"], WaitsFor(resources["web"]).Order());
+        Assert.Equal(["authservice-db", "postgres"], WaitsFor(resources["authservice"]).Order());
     }
 
     [Fact]
@@ -74,16 +87,49 @@ public sealed class EstateWiringTests
     {
         var resources = BuildModel().Resources.ToDictionary(resource => resource.Name);
 
-        foreach (var name in new[] { "boards-service", "canvas-service", "web" })
+        foreach (var name in new[] { "boards-service", "canvas-service", "web", "authservice" })
         {
             Assert.Contains(resources[name].Annotations.OfType<HealthCheckAnnotation>(), _ => true);
         }
     }
 
     [Fact]
+    public async Task ConsumersReadTheAuthorityAndTheEstateAudienceFromAuthService()
+    {
+        var resources = BuildModel().Resources.ToDictionary(resource => resource.Name);
+
+        foreach (var name in new[] { "boards-service", "canvas-service", "web" })
+        {
+            var environment = await EnvironmentOf(resources[name]);
+
+            Assert.Equal("MiroClone", environment["Auth__Issuer"]);
+            Assert.Equal("miro-clone", environment["Auth__Audience"]);
+            Assert.Equal("false", environment["Auth__RequireHttpsMetadata"]);
+            Assert.True(ReferencesResource(environment["Auth__Authority"], "authservice"));
+        }
+    }
+
+    [Fact]
+    public async Task AuthServiceSignsWithRs256FromASecretParameterAndNeverWithASharedSecret()
+    {
+        var authService = BuildModel().Resources.Single(resource => resource.Name == "authservice");
+
+        var environment = await EnvironmentOf(authService);
+
+        Assert.Equal("RS256", environment["Jwt__Algorithm"]);
+        Assert.Equal("MiroClone", environment["Jwt__Issuer"]);
+        Assert.Equal("miro-clone", environment["Jwt__Audience"]);
+        var connection = Assert.IsType<ReferenceExpression>(environment["ConnectionStrings__DefaultConnection"]);
+        Assert.True(ReferencesResource(connection, "postgres"));
+        Assert.EndsWith(";Database=authservice", connection.Format, StringComparison.Ordinal);
+        Assert.False(environment.ContainsKey("Jwt__SecretKey"));
+        Assert.True(environment.ContainsKey("Jwt__PrivateKeyPem"));
+    }
+
+    [Fact]
     public void WebAppIsTheOnlyResourceWithExternalEndpoints()
     {
-        var resources = BuildModel().Resources.OfType<ProjectResource>().ToArray();
+        var resources = BuildModel().Resources.ToArray();
 
         var exposed = resources
             .Where(resource => resource.Annotations.OfType<EndpointAnnotation>().Any(endpoint => endpoint.IsExternal))
@@ -95,6 +141,30 @@ public sealed class EstateWiringTests
 
     private static string[] WaitsFor(IResource resource) =>
         resource.Annotations.OfType<WaitAnnotation>().Select(annotation => annotation.Resource.Name).ToArray();
+
+    /// <summary>Whether a resolved environment value is built from the named resource's address.</summary>
+    private static bool ReferencesResource(object? value, string resourceName) =>
+        value is ReferenceExpression expression && expression.ValueProviders.Any(provider => provider switch
+        {
+            IResource resource => resource.Name == resourceName,
+            EndpointReferenceExpression endpoint => endpoint.Endpoint.Resource.Name == resourceName,
+            _ => false,
+        });
+
+    /// <summary>The environment the resource would start with, from its callbacks, without starting anything.</summary>
+    private static async Task<Dictionary<string, object>> EnvironmentOf(IResource resource)
+    {
+        var executionContext = new DistributedApplicationExecutionContext(
+            new DistributedApplicationExecutionContextOptions(DistributedApplicationOperation.Run));
+        var context = new EnvironmentCallbackContext(executionContext, resource: resource);
+
+        foreach (var callback in resource.Annotations.OfType<EnvironmentCallbackAnnotation>())
+        {
+            await callback.Callback(context);
+        }
+
+        return context.EnvironmentVariables.ToDictionary(pair => pair.Key, pair => pair.Value);
+    }
 
     private static string FindRepositoryRoot()
     {

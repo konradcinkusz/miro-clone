@@ -2,12 +2,14 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MiroClone.BoardsService.Canvas;
 using MiroClone.BoardsService.Persistence;
+using MiroClone.TestSupport;
 using Xunit;
 
 namespace MiroClone.BoardsService.Tests;
@@ -35,7 +37,7 @@ public sealed class BoardsApiTests : IAsyncLifetime
         _authority = await TestAuthority.StartAsync();
         _app = await ServiceHost.StartAsync(
             new Dictionary<string, string?> { ["Database:Provider"] = "InMemory" },
-            authorityBackchannel: _authority.Backchannel,
+            configureBearer: options => options.BackchannelHttpHandler = _authority.Backchannel,
             configureServices: services =>
             {
                 services.AddDbContext<BoardsDbContext>(options => options.UseInMemoryDatabase(_databaseName));
@@ -202,7 +204,7 @@ public sealed class BoardsApiTests : IAsyncLifetime
     {
         var boardId = await CreateBoardAsync("Doomed");
         await SendAsync(HttpMethod.Put, $"/api/boards/{boardId}/favourite", _ada, _workspace);
-        var token = _authority.IssueToken(_ada, _workspace, "Ada");
+        var token = BoardTokens.Issue(_authority, _ada, _workspace, "Ada");
 
         var deleted = await SendAsync(HttpMethod.Delete, $"/api/boards/{boardId}", _ada, _workspace, token: token);
         var again = await SendAsync(HttpMethod.Delete, $"/api/boards/{boardId}", _ada, _workspace);
@@ -319,7 +321,7 @@ public sealed class BoardsApiTests : IAsyncLifetime
     [Fact]
     public async Task AValidTokenWithNoActiveWorkspaceIsForbiddenNotDefaulted()
     {
-        var token = _authority.IssueToken(_ada, workspaceId: null);
+        var token = BoardTokens.Issue(_authority, _ada, null);
 
         var response = await SendAsync(HttpMethod.Get, "/api/boards", _ada, _workspace, token: token);
 
@@ -347,7 +349,7 @@ public sealed class BoardsApiTests : IAsyncLifetime
     {
         var request = new HttpRequestMessage(method, url)
         {
-            Headers = { Authorization = new AuthenticationHeaderValue("Bearer", token ?? _authority.IssueToken(user, workspace, name ?? "Member")) },
+            Headers = { Authorization = new AuthenticationHeaderValue("Bearer", token ?? BoardTokens.Issue(_authority, user, workspace, name ?? "Member")) },
         };
         if (body is not null)
         {

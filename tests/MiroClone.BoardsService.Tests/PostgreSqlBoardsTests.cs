@@ -2,8 +2,10 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.TestHost;
+using MiroClone.TestSupport;
 using Xunit;
 
 namespace MiroClone.BoardsService.Tests;
@@ -32,7 +34,7 @@ public sealed class PostgreSqlBoardsTests : IAsyncLifetime
         _authority = await TestAuthority.StartAsync();
         _app = await ServiceHost.StartAsync(
             new Dictionary<string, string?> { ["ConnectionStrings:boards"] = databaseConnection },
-            authorityBackchannel: _authority.Backchannel);
+            configureBearer: options => options.BackchannelHttpHandler = _authority.Backchannel);
         _client = _app.GetTestClient();
     }
 
@@ -72,7 +74,7 @@ public sealed class PostgreSqlBoardsTests : IAsyncLifetime
     {
         var request = new HttpRequestMessage(method, url)
         {
-            Headers = { Authorization = new AuthenticationHeaderValue("Bearer", _authority!.IssueToken(_user, _workspace, "Ada")) },
+            Headers = { Authorization = new AuthenticationHeaderValue("Bearer", BoardTokens.Issue(_authority!, _user, _workspace, "Ada")) },
         };
         if (body is not null)
         {

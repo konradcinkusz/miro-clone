@@ -42,3 +42,5 @@ matches, what a rename returns, and which database the endpoint tests use. Each 
   `pr-validation`, which is a CI decision for the owner and is listed under "Owner actions" in the PR body.
 - The kernel's Sqlite test pattern (WP02's `BoardsServiceHostTests` migration check) is retired for this service. Its migration assertion
   moved into the gated PostgreSQL test.
+- WP03's `SessionEndpointTests` hosted the service on SQLite, which hit the same migration mismatch once the Boards migration landed. It now uses
+  the in-memory provider too; its assertions are unchanged.

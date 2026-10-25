@@ -61,7 +61,7 @@ public sealed class BoardRulesTests
     {
         var userId = Guid.NewGuid();
         var workspaceId = Guid.NewGuid();
-        var principal = Principal(("sub", userId.ToString()), ("workspace", workspaceId.ToString()), ("name", "  Ada  "));
+        var principal = Principal(("sub", userId.ToString()), ("organization", workspaceId.ToString()), ("name", "  Ada  "));
 
         Assert.True(BoardCaller.TryRead(principal, out var caller));
         Assert.Equal(userId, caller.UserId);
@@ -80,7 +80,7 @@ public sealed class BoardRulesTests
     [Fact]
     public void CallerWithoutANameFallsBackToAGenericMemberName()
     {
-        var principal = Principal(("sub", Guid.NewGuid().ToString()), ("workspace", Guid.NewGuid().ToString()));
+        var principal = Principal(("sub", Guid.NewGuid().ToString()), ("organization", Guid.NewGuid().ToString()));
 
         Assert.True(BoardCaller.TryRead(principal, out var caller));
         Assert.Equal("Member", caller.AuthorName);
@@ -91,7 +91,7 @@ public sealed class BoardRulesTests
     {
         var principal = Principal(
             ("sub", Guid.NewGuid().ToString()),
-            ("workspace", Guid.NewGuid().ToString()),
+            ("organization", Guid.NewGuid().ToString()),
             ("name", new string('n', 300)));
 
         Assert.True(BoardCaller.TryRead(principal, out var caller));

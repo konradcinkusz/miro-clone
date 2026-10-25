@@ -12,14 +12,16 @@ Instructions for coding agents and contributors. `CLAUDE.md` imports this file.
 | `global.json` | Pins the .NET 10 SDK | WP00 |
 | `docs/implementation-plan/` | Work packages, sub-session protocol, frozen contracts | WP00 |
 | `docs/decisions/` | ADRs (`NNNN-title.md`), each citing the principle it applies | WP00 |
+| `docs/AUTH.md` | Claims, token rules and the dev sign-in flow against authservice | WP03 |
+| `scripts/seed-dev-users.sh` | Seeds two dev users in one authservice organization over its API | WP03 |
 | `.github/workflows/` | `pr-validation` (restore/build/test), `secret-scan` (gitleaks) | WP00 |
 | `.githooks/` + `scripts/install-hooks.sh` | Pre-commit gitleaks hook (fails closed) | WP00 |
-| `MiroClone.AppHost` | Aspire composition root: PostgreSQL (`boards`, `canvas`), services, web | WP02 |
+| `MiroClone.AppHost` | Aspire composition root: PostgreSQL (`boards`, `canvas`, `authservice`), pinned authservice image, services, web | WP02, WP03 |
 | `MiroClone.ServiceDefaults` | Shared kernel (no domain types), ceiling 800 lines (ADR 0005) | WP01 |
 | `MiroClone.BoardsService` | Boards and favourites, PostgreSQL `boards`: `/api/boards`, migrations, canvas purge client | WP04 |
 | `MiroClone.CanvasService` | Canvas aggregate, JSON snapshot, SignalR `/hubs/canvas`. Skeleton: `/health`, migrations | WP02 (aggregate WP05) |
 | `MiroClone.Web` | Blazor Web App, interactive Server; the BFF. Skeleton: `/` renders Hello | WP02 |
-| `tests/` | One xUnit project per service; `Web.Tests` (bUnit); `Web.E2E` (Playwright, WP07+). `AppHost.Tests`, `BoardsService.Tests`, `CanvasService.Tests`, `ServiceDefaults.Tests` (WP01/WP02) | partial |
+| `tests/` | One xUnit project per service; `Web.Tests` (bUnit); `Web.E2E` (Playwright, WP07+). `AppHost.Tests`, `BoardsService.Tests`, `CanvasService.Tests`, `ServiceDefaults.Tests` (WP01/WP02). `TestSupport`: local authservice stand-in and token factory, offline (WP03) | partial |
 
 ## Build and test
 
