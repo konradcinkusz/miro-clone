@@ -91,7 +91,7 @@ internal sealed class BoardService(BoardsDbContext database, CanvasPurgeClient c
 
     /// <summary>
     /// Deletes the board and its favourites in one transaction, then purges the canvas snapshot after the commit. A purge
-    /// that fails does not undo the delete: the snapshot is an orphan, which nothing reads (ADR 0011).
+    /// that fails does not undo the delete: the snapshot is an orphan, which nothing reads (ADR 0013).
     /// </summary>
     public async Task<bool> DeleteAsync(BoardCaller caller, Guid boardId, string? authorization, CancellationToken cancellationToken)
     {

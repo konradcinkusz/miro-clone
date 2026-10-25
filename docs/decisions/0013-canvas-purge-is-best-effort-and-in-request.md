@@ -1,4 +1,4 @@
-# 0011 — A deleted board's canvas is purged in the request, best effort, with the caller's token; the orphan is harmless
+# 0013 — A deleted board's canvas is purged in the request, best effort, with the caller's token; the orphan is harmless
 
 - **Status:** Accepted
 - **Date:** 2026-10-25

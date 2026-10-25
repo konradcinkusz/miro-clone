@@ -2,7 +2,7 @@ namespace MiroClone.BoardsService.Boards;
 
 /// <summary>
 /// Clamps list inputs instead of rejecting them (service-api-patterns §4): an unclamped limit is a one-line outage,
-/// so a page size above the contract's 50 is served as 50, not as an error (ADR 0012).
+/// so a page size above the contract's 50 is served as 50, not as an error (ADR 0014).
 /// </summary>
 public static class ListPaging
 {

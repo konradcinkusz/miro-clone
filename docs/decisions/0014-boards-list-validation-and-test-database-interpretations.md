@@ -1,4 +1,4 @@
-# 0012 — Boards list, validation and test-database interpretations
+# 0014 — Boards list, validation and test-database interpretations
 
 - **Status:** Accepted
 - **Date:** 2026-10-25

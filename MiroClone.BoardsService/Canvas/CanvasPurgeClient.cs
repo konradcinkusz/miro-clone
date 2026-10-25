@@ -7,7 +7,7 @@ namespace MiroClone.BoardsService.Canvas;
 
 /// <summary>
 /// The anti-corruption client for CanvasService's snapshot purge (ADR 0003). Best effort: a failed purge is logged and
-/// returns false, and the board stays deleted. The orphan snapshot it leaves is harmless (ADR 0011).
+/// returns false, and the board stays deleted. The orphan snapshot it leaves is harmless (ADR 0013).
 /// </summary>
 internal sealed partial class CanvasPurgeClient(HttpClient http, ILogger<CanvasPurgeClient> logger)
 {
