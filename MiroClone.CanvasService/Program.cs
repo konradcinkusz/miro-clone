@@ -8,5 +8,7 @@ builder.Services.AddCanvasService(builder.Configuration);
 
 var app = builder.Build();
 app.UseOriginGuard();
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapDefaultEndpoints();
 app.Run();

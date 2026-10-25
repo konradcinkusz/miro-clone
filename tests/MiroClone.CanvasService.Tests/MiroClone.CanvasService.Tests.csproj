@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\MiroClone.CanvasService\MiroClone.CanvasService.csproj" />
     <ProjectReference Include="..\..\MiroClone.ServiceDefaults\MiroClone.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\MiroClone.TestSupport\MiroClone.TestSupport.csproj" />
   </ItemGroup>
 
 </Project>
