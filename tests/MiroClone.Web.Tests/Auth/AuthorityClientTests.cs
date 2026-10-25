@@ -67,6 +67,21 @@ public sealed class AuthorityClientTests : IDisposable
     }
 
     [Fact]
+    public async Task ProblemDetailsValidationErrorsAreReadFromTheFieldMap()
+    {
+        _harness.Authority.On(HttpMethod.Post, "api/v1/auth/reset-password", HttpStatusCode.BadRequest, new
+        {
+            title = "One or more validation errors occurred.",
+            status = 400,
+            errors = new Dictionary<string, string[]> { ["Token"] = ["Reset token is required"] },
+        });
+
+        var result = await _harness.AuthorityClient.ResetPasswordAsync("owner@dev.test", string.Empty, "new-pass-123", TestContext.Current.CancellationToken);
+
+        Assert.Equal("Reset token is required", result.Error);
+    }
+
+    [Fact]
     public async Task TwoFactorAccountsAreRefusedNotSignedIn()
     {
         _harness.Authority.On(HttpMethod.Post, "api/v1/auth/login", HttpStatusCode.OK, new { requiresTwoFactor = true, challengeToken = "c", expiresIn = 300 });

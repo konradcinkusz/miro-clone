@@ -253,13 +253,30 @@ public sealed class AuthorityClient(HttpClient http)
                 return message;
             }
 
-            if (body.TryGetProperty("errors", out var errors) && errors.ValueKind == JsonValueKind.Array && errors.GetArrayLength() > 0
-                && errors[0].ValueKind == JsonValueKind.String)
+            // Validation failures: { errors: { "Field": ["message"] } } (ProblemDetails) or { errors: ["message"] }.
+            if (body.TryGetProperty("errors", out var errors))
             {
-                return errors[0].GetString() ?? UnreadableReply;
+                var first = errors.ValueKind switch
+                {
+                    JsonValueKind.Array => errors.EnumerateArray().FirstOrDefault(),
+                    JsonValueKind.Object => errors.EnumerateObject().Select(field => field.Value).FirstOrDefault(),
+                    _ => default,
+                };
+                var text = first.ValueKind switch
+                {
+                    JsonValueKind.String => first.GetString(),
+                    JsonValueKind.Array => first.EnumerateArray().FirstOrDefault().ValueKind == JsonValueKind.String
+                        ? first.EnumerateArray().First().GetString()
+                        : null,
+                    _ => null,
+                };
+                if (text is not null)
+                {
+                    return text;
+                }
             }
 
-            return UnreadableReply;
+            return Text(body, "title") ?? UnreadableReply;
         }
     }
 }
