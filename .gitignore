@@ -1,0 +1,27 @@
+# .NET build output
+bin/
+obj/
+out/
+TestResults/
+*.user
+*.suo
+*.binlog
+*.DotSettings.user
+
+# IDE / editor
+.vs/
+.vscode/
+.idea/
+*.swp
+
+# Local secrets and environment: never committed (see scripts/install-hooks.sh and gitleaks hook)
+.env
+.env.*
+!secrets.env.example
+
+# Local Claude Code overrides
+.claude/settings.local.json
+
+# OS noise
+.DS_Store
+Thumbs.db

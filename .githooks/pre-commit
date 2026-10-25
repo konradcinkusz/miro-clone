@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Pre-commit secret scan. Fails closed: without gitleaks installed, the commit is refused.
+set -euo pipefail
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "pre-commit: gitleaks is not installed; refusing to commit without a secret scan." >&2
+  echo "Install it (https://github.com/gitleaks/gitleaks#installing), then commit again." >&2
+  exit 1
+fi
+
+exec gitleaks git --pre-commit --staged --redact --verbose

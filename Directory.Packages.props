@@ -1,0 +1,17 @@
+<Project>
+
+  <!--
+    Central Package Management: the only place package versions are written.
+    Projects reference packages without a Version attribute. Upgrading a library is one diff.
+    Packages are added by the work package that first needs them.
+  -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- No package versions yet (WP00 is an empty solution). -->
+  </ItemGroup>
+
+</Project>

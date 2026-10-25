@@ -1,0 +1,15 @@
+# Normalise text to LF in the repository; check out as the platform's native endings.
+* text=auto eol=lf
+
+# Binary assets: never diff or normalise.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
+
+# Language-aware diffs for hunk headers.
+*.cs diff=csharp
