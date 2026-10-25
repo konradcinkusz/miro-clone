@@ -50,19 +50,22 @@ public static class EstateExtensions
         // Its own public origin: the jwks_uri in the discovery document must be reachable by the services (docs/DEPLOYMENT.md).
         authService.WithEnvironment("Jwt__PublicBaseUrl", AuthorityUrl(authService));
 
-        var boardsService = builder
-            .AddProject("boards-service", ProjectPath(repositoryRoot, "MiroClone.BoardsService"))
-            .WithHttpEndpoint(env: "ASPNETCORE_HTTP_PORTS")
-            .WithReference(boardsDatabase)
-            .WaitFor(boardsDatabase)
-            .WithAuthority(authService)
-            .WithHttpHealthCheck("/health");
-
         var canvasService = builder
             .AddProject("canvas-service", ProjectPath(repositoryRoot, "MiroClone.CanvasService"))
             .WithHttpEndpoint(env: "ASPNETCORE_HTTP_PORTS")
             .WithReference(canvasDatabase)
             .WaitFor(canvasDatabase)
+            .WithAuthority(authService)
+            .WithHttpHealthCheck("/health");
+
+        // Boards reaches Canvas only to purge a deleted board's snapshot. It does not WaitFor Canvas: the purge is best effort,
+        // and a wait in both directions would be a startup cycle.
+        var boardsService = builder
+            .AddProject("boards-service", ProjectPath(repositoryRoot, "MiroClone.BoardsService"))
+            .WithHttpEndpoint(env: "ASPNETCORE_HTTP_PORTS")
+            .WithReference(boardsDatabase)
+            .WaitFor(boardsDatabase)
+            .WithReference(canvasService)
             .WithAuthority(authService)
             .WithHttpHealthCheck("/health");
 

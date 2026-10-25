@@ -19,7 +19,6 @@ public sealed class SessionEndpointTests : IAsyncLifetime
     private const string Audience = "miro-clone";
     private readonly Guid _userId = Guid.NewGuid();
     private readonly Guid _organizationId = Guid.NewGuid();
-    private readonly string _databaseFile = Path.Combine(Path.GetTempPath(), $"session-{Guid.NewGuid():N}.db");
     private TestAuthority _authority = null!;
     private WebApplication _app = null!;
     private HttpClient _client = null!;
@@ -28,11 +27,8 @@ public sealed class SessionEndpointTests : IAsyncLifetime
     {
         _authority = await TestAuthority.StartAsync();
         _app = await ServiceHost.StartAsync(
-            new Dictionary<string, string?>
-            {
-                ["Database:Provider"] = "Sqlite",
-                ["ConnectionStrings:boards"] = $"Data Source={_databaseFile}",
-            },
+            // In-memory: the boards migration is PostgreSQL-generated and does not run on SQLite (ADR 0014).
+            new Dictionary<string, string?> { ["Database:Provider"] = "InMemory" },
             options => options.BackchannelHttpHandler = _authority.Backchannel);
         _client = _app.GetTestClient();
     }
@@ -43,8 +39,6 @@ public sealed class SessionEndpointTests : IAsyncLifetime
         await _app.StopAsync();
         await _app.DisposeAsync();
         await _authority.DisposeAsync();
-        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-        File.Delete(_databaseFile);
     }
 
     [Fact]

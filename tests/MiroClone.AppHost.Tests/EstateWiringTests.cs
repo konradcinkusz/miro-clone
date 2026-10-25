@@ -70,6 +70,19 @@ public sealed class EstateWiringTests
     }
 
     [Fact]
+    public void BoardsServiceReferencesCanvasForThePurgeWithoutWaitingOnIt()
+    {
+        var resources = BuildModel().Resources.ToDictionary(resource => resource.Name);
+
+        var references = resources["boards-service"].Annotations.OfType<ResourceRelationshipAnnotation>()
+            .Select(annotation => annotation.Resource.Name)
+            .ToArray();
+
+        Assert.Contains("canvas-service", references);
+        Assert.DoesNotContain("canvas-service", WaitsFor(resources["boards-service"]));
+    }
+
+    [Fact]
     public void EveryServiceAndTheWebAppIsGatedOnItsHealthProbe()
     {
         var resources = BuildModel().Resources.ToDictionary(resource => resource.Name);

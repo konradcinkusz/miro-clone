@@ -10,7 +10,8 @@ internal static class PostgreSqlTestDatabase
 {
     public const string DatabaseName = "boards_test";
 
-    public static async Task<string> PrepareAsync(string serverConnectionString, CancellationToken cancellationToken)
+    /// <param name="databaseName">One name per test class: classes run in parallel, and two creating the same database race.</param>
+    public static async Task<string> PrepareAsync(string serverConnectionString, CancellationToken cancellationToken, string databaseName = DatabaseName)
     {
         var admin = new NpgsqlConnectionStringBuilder(serverConnectionString) { Database = "postgres" };
         await using var connection = new NpgsqlConnection(admin.ConnectionString);
@@ -18,14 +19,14 @@ internal static class PostgreSqlTestDatabase
 
         await using (var exists = new NpgsqlCommand("SELECT 1 FROM pg_database WHERE datname = @name", connection))
         {
-            exists.Parameters.AddWithValue("name", DatabaseName);
+            exists.Parameters.AddWithValue("name", databaseName);
             if (await exists.ExecuteScalarAsync(cancellationToken) is null)
             {
-                await using var create = new NpgsqlCommand($"CREATE DATABASE \"{DatabaseName}\"", connection);
+                await using var create = new NpgsqlCommand($"CREATE DATABASE \"{databaseName}\"", connection);
                 await create.ExecuteNonQueryAsync(cancellationToken);
             }
         }
 
-        return new NpgsqlConnectionStringBuilder(serverConnectionString) { Database = DatabaseName }.ConnectionString;
+        return new NpgsqlConnectionStringBuilder(serverConnectionString) { Database = databaseName }.ConnectionString;
     }
 }
