@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    Boards and favourites (ADR 0003). Owns the "boards" PostgreSQL database; no other service opens it.
+    Program.cs is the manifest (P9); wiring lives in ServiceCollectionExtensions.
+  -->
+  <PropertyGroup>
+    <RootNamespace>MiroClone.BoardsService</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MiroClone.ServiceDefaults\MiroClone.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- design time only: dotnet ef migrations add -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>
