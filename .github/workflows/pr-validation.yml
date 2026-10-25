@@ -1,0 +1,53 @@
+# PR validation: restore, build and test the solution.
+# Skips cleanly while the tree has no .csproj files (WP00 is an empty solution).
+name: pr-validation
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pr-validation:
+    name: pr-validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect projects
+        id: detect
+        run: |
+          if git ls-files '*.csproj' | grep -q .; then
+            echo "has_projects=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_projects=false" >> "$GITHUB_OUTPUT"
+            echo "No .csproj in the tree yet: restore, build and test skipped." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Set up .NET SDK from global.json
+        if: steps.detect.outputs.has_projects == 'true'
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        if: steps.detect.outputs.has_projects == 'true'
+        run: dotnet restore MiroClone.sln
+
+      - name: Build
+        if: steps.detect.outputs.has_projects == 'true'
+        run: dotnet build MiroClone.sln --no-restore --configuration Release
+
+      - name: Test
+        if: steps.detect.outputs.has_projects == 'true'
+        run: dotnet test MiroClone.sln --no-build --configuration Release
