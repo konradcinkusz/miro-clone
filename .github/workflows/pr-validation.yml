@@ -24,6 +24,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Repo guards
+        run: scripts/check-kernel-size.sh
+
       - name: Detect projects
         id: detect
         run: |
