@@ -21,8 +21,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\MiroClone.Web\MiroClone.Web.csproj" />
-    <!-- Tests only: the round-trip test reads the boards service's own record types (blazor-web-app §5). -->
+    <!-- Tests only: the round-trip tests read the services' own record types (blazor-web-app §5, §13). -->
     <ProjectReference Include="..\..\MiroClone.BoardsService\MiroClone.BoardsService.csproj" />
+    <ProjectReference Include="..\..\MiroClone.CanvasService\MiroClone.CanvasService.csproj" />
   </ItemGroup>
 
 </Project>

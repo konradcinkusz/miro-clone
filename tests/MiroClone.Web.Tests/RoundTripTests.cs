@@ -1,10 +1,14 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Nodes;
+using MiroClone.CanvasService.Canvas;
 using MiroClone.Web.Api;
 using Xunit;
 using ServiceBoardPage = MiroClone.BoardsService.Boards.BoardPage;
 using ServiceBoardSummary = MiroClone.BoardsService.Boards.BoardSummary;
+using ServiceCanvasState = MiroClone.CanvasService.Canvas.CanvasState;
+using ServiceLayer = MiroClone.CanvasService.Canvas.Layer;
+using ServiceLayerType = MiroClone.CanvasService.Canvas.LayerType;
 
 namespace MiroClone.Web.Tests;
 
@@ -50,6 +54,32 @@ public sealed class RoundTripTests
 
         Assert.Equal(json, JsonSerializer.Serialize(service, Wire));
         Assert.Equal("Sketch", service.Items.Single().Title);
+    }
+
+    [Fact]
+    public void ACanvasStateSerializedByTheCanvasServiceReadsIntoTheCopy()
+    {
+        var rectangle = Guid.Parse("00000000-0000-0000-0000-00000000000a");
+        var stroke = Guid.Parse("00000000-0000-0000-0000-00000000000b");
+        var state = new ServiceCanvasState(
+            Version: 7,
+            LayerIds: [rectangle, stroke],
+            Layers: new Dictionary<Guid, ServiceLayer>
+            {
+                [rectangle] = new(rectangle, ServiceLayerType.Rectangle, 10, 20, 100, 50, new Rgb(255, 200, 0)),
+                [stroke] = new(stroke, ServiceLayerType.Path, 0, 0, 5, 5, new Rgb(0, 0, 0), Value: null, Points: [new PathPoint(0, 0), new PathPoint(5, 5)]),
+            });
+
+        // The canvas endpoint writes with CanvasJson.Options: string enums, nulls omitted, path points as pairs.
+        var json = JsonSerializer.Serialize(state, CanvasJson.Options);
+        var copy = JsonSerializer.Deserialize<CanvasStateDto>(json, Wire)!;
+
+        Assert.Contains("\"type\":\"Rectangle\"", json);
+        Assert.Equal(7, copy.Version);
+        Assert.Equal(new[] { rectangle, stroke }, copy.LayerIds);
+        Assert.Equal(new FillDto(255, 200, 0), copy.Layers[rectangle].Fill);
+        Assert.Equal(new double[] { 0, 0 }, copy.Layers[stroke].Points![0]);
+        Assert.Equal(new double[] { 5, 5 }, copy.Layers[stroke].Points![1]);
     }
 
     [Fact]

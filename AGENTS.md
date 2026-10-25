@@ -19,7 +19,7 @@ Instructions for coding agents and contributors. `CLAUDE.md` imports this file.
 | `MiroClone.AppHost` | Aspire composition root: PostgreSQL (`boards`, `canvas`, `authservice`), pinned authservice image, services, web | WP02, WP03 |
 | `MiroClone.ServiceDefaults` | Shared kernel (no domain types), ceiling 800 lines (ADR 0005) | WP01 |
 | `MiroClone.BoardsService` | Boards and favourites, PostgreSQL `boards`: `/api/boards`, migrations, canvas purge client | WP04 |
-| `MiroClone.CanvasService` | Canvas aggregate, JSON snapshot, SignalR `/hubs/canvas`. Skeleton: `/health`, migrations | WP02 (aggregate WP05) |
+| `MiroClone.CanvasService` | Canvas aggregate (`Canvas/`), write-behind JSON snapshot (`Persistence/`, ADR 0015), SignalR `/hubs/canvas` and REST `/api/canvas` (`Realtime/`, `Api/`, ADR 0016) | WP05 |
 | `MiroClone.Web` | Blazor Web App, interactive Server; the BFF. Sign-in, server-side sessions, dashboard shell, visual token contract (`wwwroot/app.css`) | WP02, WP06 |
 | `tests/` | One xUnit project per service; `Web.Tests` (bUnit); `Web.E2E` (Playwright, WP07+). `AppHost.Tests`, `BoardsService.Tests`, `CanvasService.Tests`, `ServiceDefaults.Tests` (WP01/WP02). `TestSupport`: local authservice stand-in and token factory, offline (WP03) | partial |
 

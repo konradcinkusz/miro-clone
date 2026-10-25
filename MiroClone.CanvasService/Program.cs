@@ -1,4 +1,6 @@
 using MiroClone.CanvasService;
+using MiroClone.CanvasService.Api;
+using MiroClone.CanvasService.Realtime;
 using MiroClone.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,5 +12,8 @@ var app = builder.Build();
 app.UseOriginGuard();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 app.MapDefaultEndpoints();
+app.MapCanvasEndpoints();
+app.MapHub<CanvasHub>(CanvasHubMessages.HubPath);
 app.Run();

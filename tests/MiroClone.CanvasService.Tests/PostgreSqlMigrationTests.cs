@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MiroClone.CanvasService.Persistence;
+using MiroClone.ServiceDefaults;
 using Xunit;
 
 namespace MiroClone.CanvasService.Tests;
@@ -20,6 +21,7 @@ public sealed class PostgreSqlMigrationTests
         var databaseConnection = await PostgreSqlTestDatabase.PrepareAsync(connectionString, TestContext.Current.CancellationToken);
         await using var app = await ServiceHost.StartAsync(new Dictionary<string, string?>
         {
+            ["Database:Provider"] = DatabaseProviders.Npgsql,
             ["ConnectionStrings:canvas"] = databaseConnection,
         });
         using var scope = app.Services.CreateScope();
