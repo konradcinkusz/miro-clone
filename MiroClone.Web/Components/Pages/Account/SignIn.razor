@@ -1,0 +1,54 @@
+@page "/sign-in"
+@attribute [ExcludeFromInteractiveRouting]
+@using MiroClone.Web.Auth
+@using MiroClone.Web.Components.Shared
+
+<PageTitle>Sign in · MiroClone</PageTitle>
+
+<section class="card narrow" aria-labelledby="sign-in-heading">
+    <h1 id="sign-in-heading">Sign in</h1>
+
+    <StatusAlert Message="@Error" />
+    @if (Verified == "1")
+    {
+        <p class="callout callout-success" role="status">Your email address is verified. Sign in to continue.</p>
+    }
+    @if (PasswordReset == "1")
+    {
+        <p class="callout callout-success" role="status">Your password was changed. Sign in with the new one.</p>
+    }
+
+    <form method="post" action="/account/sign-in" class="stack" data-testid="sign-in-form">
+        <AntiforgeryToken />
+        <input type="hidden" name="returnUrl" value="@SafeReturnUrl" />
+        <div class="field">
+            <label for="sign-in-email">Email</label>
+            <input id="sign-in-email" name="email" type="email" autocomplete="email" required maxlength="256" />
+        </div>
+        <div class="field">
+            <label for="sign-in-password">Password</label>
+            <input id="sign-in-password" name="password" type="password" autocomplete="current-password" required />
+        </div>
+        <button class="btn btn-primary" type="submit" data-testid="sign-in-submit">Sign in</button>
+    </form>
+
+    <p class="muted">
+        <a href="/sign-up">Create an account</a> · <a href="/forgot-password">Forgot your password?</a>
+    </p>
+</section>
+
+@code {
+    [SupplyParameterFromQuery(Name = "error")]
+    public string? Error { get; set; }
+
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromQuery(Name = "verified")]
+    public string? Verified { get; set; }
+
+    [SupplyParameterFromQuery(Name = "reset")]
+    public string? PasswordReset { get; set; }
+
+    private string SafeReturnUrl => LocalReturnUrl.Resolve(ReturnUrl);
+}

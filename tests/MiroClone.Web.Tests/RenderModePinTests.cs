@@ -31,6 +31,15 @@ public sealed class RenderModePinTests
     }
 
     [Fact]
+    public void TheVisualTokenStylesheetIsLinkedBeforeTheScopedStyles()
+    {
+        var tokens = App.IndexOf("@Assets[\"app.css\"]", StringComparison.Ordinal);
+        var scoped = App.IndexOf("@Assets[\"MiroClone.Web.styles.css\"]", StringComparison.Ordinal);
+
+        Assert.True(tokens >= 0 && tokens < scoped, "app.css must be linked, ahead of the scoped bundle, or no page is styled.");
+    }
+
+    [Fact]
     public void HostRegistersInteractiveServerAndNoWebAssembly()
     {
         Assert.Contains("AddInteractiveServerComponents()", File.ReadAllText(Path.Combine(Root, "MiroClone.Web", "ServiceCollectionExtensions.cs")));

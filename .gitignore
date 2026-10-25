@@ -25,3 +25,6 @@ TestResults/
 # OS noise
 .DS_Store
 Thumbs.db
+
+# Web app: Data Protection keys persisted on the developer machine (ServiceCollectionExtensions.AddDataProtection)
+App_Data/
