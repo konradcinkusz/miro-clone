@@ -13,7 +13,10 @@ public sealed class JwtValidationOptions
     /// <summary>authservice base URL. Signing keys are read from its discovery document and JWKS.</summary>
     public string Authority { get; set; } = string.Empty;
 
-    /// <summary>Audience this service accepts. A token minted for another service is refused (ADR 0007).</summary>
+    /// <summary>
+    /// Audience a token must carry. The estate shares one audience, because authservice mints one audience per token
+    /// (ADR 0011). A token minted for another product is refused.
+    /// </summary>
     public string Audience { get; set; } = string.Empty;
 
     /// <summary>Expected issuer. When empty, the issuer the authority advertises is used.</summary>
@@ -53,7 +56,7 @@ public static class AuthenticationExtensions
 {
     /// <summary>
     /// Validates bearer tokens from authservice. Keys come from its JWKS, so rotation needs no redeploy (identity guide §10).
-    /// Tokens must be RS256, carry this service's audience and be unexpired. Fails at startup on a bad configuration.
+    /// Tokens must be RS256, carry the estate audience and be unexpired. Fails at startup on a bad configuration.
     /// </summary>
     /// <param name="configureBearer">Optional hook for tests and hosts, such as a backchannel handler. Applied last.</param>
     public static IServiceCollection AddJwtValidation(
@@ -71,7 +74,7 @@ public static class AuthenticationExtensions
                 options.Authority = settings.Authority;
                 options.RequireHttpsMetadata = settings.RequireHttpsMetadata;
 
-                // Keep the claim names as issued ("sub", "workspace"), not the legacy .NET URIs.
+                // Keep the claim names as issued ("sub", "organization"), not the legacy .NET URIs.
                 options.MapInboundClaims = false;
 
                 options.TokenValidationParameters = new TokenValidationParameters

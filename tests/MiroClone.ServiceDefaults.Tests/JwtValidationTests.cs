@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using MiroClone.TestSupport;
 using Xunit;
 
 namespace MiroClone.ServiceDefaults.Tests;
@@ -12,9 +13,9 @@ namespace MiroClone.ServiceDefaults.Tests;
 /// <summary>JWT validation against a JWKS served by a local authority in the test host (no network).</summary>
 public sealed class JwtValidationTests : IAsyncLifetime
 {
-    private const string Audience = "miro-clone-boards";
+    private const string Audience = "miro-clone";
     private readonly Guid _userId = Guid.NewGuid();
-    private readonly Guid _workspaceId = Guid.NewGuid();
+    private readonly Guid _organizationId = Guid.NewGuid();
     private TestAuthority _authority = null!;
     private WebApplication _app = null!;
     private HttpClient _client = null!;
@@ -55,14 +56,14 @@ public sealed class JwtValidationTests : IAsyncLifetime
     [Fact]
     public async Task ValidTokenIsAcceptedAndItsUserAndWorkspaceAreRead()
     {
-        var token = _authority.IssueToken(Audience, _userId, _workspaceId, DateTime.UtcNow.AddMinutes(5));
+        var token = _authority.IssueToken(Audience, _userId, [_organizationId], DateTime.UtcNow.AddMinutes(5));
 
         var response = await SendAsync(token);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         Assert.Contains(_userId.ToString(), body);
-        Assert.Contains(_workspaceId.ToString(), body);
+        Assert.Contains(_organizationId.ToString(), body);
     }
 
     [Fact]
@@ -76,7 +77,7 @@ public sealed class JwtValidationTests : IAsyncLifetime
     [Fact]
     public async Task TokenForAnotherAudienceIsRefused()
     {
-        var token = _authority.IssueToken("another-service", _userId, _workspaceId, DateTime.UtcNow.AddMinutes(5));
+        var token = _authority.IssueToken("another-product", _userId, [_organizationId], DateTime.UtcNow.AddMinutes(5));
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await SendAsync(token)).StatusCode);
     }
@@ -84,7 +85,7 @@ public sealed class JwtValidationTests : IAsyncLifetime
     [Fact]
     public async Task TokenExpiredBeyondClockSkewIsRefused()
     {
-        var token = _authority.IssueToken(Audience, _userId, _workspaceId, DateTime.UtcNow.AddMinutes(-10));
+        var token = _authority.IssueToken(Audience, _userId, [_organizationId], DateTime.UtcNow.AddMinutes(-10));
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await SendAsync(token)).StatusCode);
     }
@@ -94,7 +95,7 @@ public sealed class JwtValidationTests : IAsyncLifetime
     {
         using var rogueKey = System.Security.Cryptography.RSA.Create(2048);
         var token = TokenFactory.Rs256(rogueKey, TestAuthority.KeyId, TestAuthority.Issuer, Audience,
-            _userId, _workspaceId, DateTime.UtcNow.AddMinutes(5));
+            _userId, [_organizationId], DateTime.UtcNow.AddMinutes(5));
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await SendAsync(token)).StatusCode);
     }
@@ -102,7 +103,7 @@ public sealed class JwtValidationTests : IAsyncLifetime
     [Fact]
     public async Task SymmetricHS256TokenIsRefusedEvenWithAValidAudience()
     {
-        var token = TokenFactory.Hs256(Audience, _userId, _workspaceId);
+        var token = TokenFactory.Hs256(TestAuthority.Issuer, Audience, _userId, [_organizationId]);
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await SendAsync(token)).StatusCode);
     }
