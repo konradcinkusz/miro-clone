@@ -1,0 +1,51 @@
+# Web (the BFF) for the estate, DEV (ADR 0001, ADR 0017). Blazor Server: the circuit holds state in memory, so it runs on one
+# machine, and the Data Protection keys sit on a volume so they survive a restart.
+
+app = "miroclone-web-dev"
+primary_region = "fra"
+
+[build]
+  dockerfile = "../MiroClone.Web/Dockerfile"
+  context = ".."
+
+[env]
+  ASPNETCORE_ENVIRONMENT = "Production"
+  ASPNETCORE_URLS = "http://+:8080"
+  # Keys persist here (ADR 0017). Setting this path is what turns persistence on; local runs keep the framework default.
+  DataProtection__KeysPath = "/data/keys"
+  Auth__Authority = "https://miroclone-authservice-dev.fly.dev"
+  Auth__Issuer = "MiroClone"
+  Auth__Audience = "miro-clone"
+
+# One machine: a volume is bound to one machine, and circuits are in memory (ADR 0017, ADR 0018).
+[deploy]
+  strategy = "immediate"
+
+[[mounts]]
+  source = "web_keys"
+  destination = "/data/keys"
+  initial_size = "1gb"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  # Entered from a browser, and a Blazor circuit is a live WebSocket: a cold start is a slow first page, so one machine stays warm.
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 250
+    soft_limit = 200
+
+[[http_service.checks]]
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "60s"
+  method = "GET"
+  path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
