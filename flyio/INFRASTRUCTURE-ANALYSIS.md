@@ -22,7 +22,7 @@ Total: four application machines plus the database, all always on, and 11 GB of 
 - **Boards.** Web will call `/api/boards` synchronously for every page that lists or opens a board (WP05 and WP06 wire the typed clients).
 - **Canvas.** Boards calls Canvas when a board is deleted (ADR 0013). Web will call it on every canvas open (WP10).
 - **Web.** Entered from a browser, and a Blazor circuit is a live WebSocket. A cold start is a slow first page, but the circuit is state held
-  in memory, and it is kept warm for the same reason as the others (ADR 0017).
+  in memory, and it is kept warm for the same reason as the others (ADR 0019).
 - **PostgreSQL.** Never scales to zero: a database that sleeps delays every request that reaches it.
 
 ## 3. The cheaper option, and what it costs
@@ -36,12 +36,12 @@ Total: four application machines plus the database, all always on, and 11 GB of 
 ## 4. What is off the table
 
 - `force_https = false`, or a plain-http authority: tokens and cookies would travel in clear.
-- One database shared by two services, or one role across databases (ADR 0015, `shared-service-reuse` §5).
+- One database shared by two services, or one role across databases (ADR 0017, `shared-service-reuse` §5).
 - A public listener on PostgreSQL.
 - Authservice instance shared with another estate: its key would be a shared trust root.
-- Scaling Boards, Canvas or Web past one machine until their migrations and the Web key ring move (ADR 0017, ADR 0018).
+- Scaling Boards, Canvas or Web past one machine until their migrations and the Web key ring move (ADR 0019, ADR 0020).
 
 ## Previews
 
-Each preview runs four apps at `min_machines_running = 0`, so a closed preview costs its volume only (ADR 0019). The dev PostgreSQL is shared,
+Each preview runs four apps at `min_machines_running = 0`, so a closed preview costs its volume only (ADR 0021). The dev PostgreSQL is shared,
 and each preview adds three small databases.

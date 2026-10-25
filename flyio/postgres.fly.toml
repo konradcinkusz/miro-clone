@@ -1,11 +1,11 @@
-# PostgreSQL 17 for the estate, DEV (ADR 0015). One private Fly app, one volume, three logical databases. Each database
+# PostgreSQL 17 for the estate, DEV (ADR 0017). One private Fly app, one volume, three logical databases. Each database
 # has its own login role and no cross-grants, so a service that holds its own password cannot reach another's data
 # (shared-service-reuse §5, fly-io-deployment §5 and §8).
 #
 # PRIVATE: no [http_service] and no [[services]]. Reached only at miroclone-postgres-dev.internal:5432 over Fly's 6PN mesh.
 # Connection strings (set as Fly secrets on each consumer, flyio/SECRETS.md):
 #   Host=miroclone-postgres-dev.internal;Port=5432;Database=<db>;Username=<role>;Password=<secret>;SSL Mode=Disable
-# SSL Mode=Disable: the mesh is WireGuard-encrypted, and this image has no TLS certificates (ADR 0015 records the trade-off).
+# SSL Mode=Disable: the mesh is WireGuard-encrypted, and this image has no TLS certificates (ADR 0017 records the trade-off).
 
 app = "miroclone-postgres-dev"
 primary_region = "fra"

@@ -1,4 +1,4 @@
-# 0018 — Migrating services run one machine, and each deploy replaces it rather than overlapping
+# 0020 — Migrating services run one machine, and each deploy replaces it rather than overlapping
 
 - **Status:** Accepted. Settles the decision ADR 0009 deferred to WP13.
 - **Date:** 2026-10-25

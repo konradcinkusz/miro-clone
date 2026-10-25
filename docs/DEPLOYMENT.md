@@ -1,6 +1,6 @@
 # Deployment
 
-How the estate reaches Fly.io, what the owner does once, and what to check on each deploy. The decisions are in ADR 0015–0019. The
+How the estate reaches Fly.io, what the owner does once, and what to check on each deploy. The decisions are in ADR 0017–0021. The
 standards applied are `fly-io-deployment`, `pr-preview-environments` and `shared-service-reuse`.
 
 **Status:** the configuration and workflows are in the repository and lint clean. **No deploy has been run.** Every item in
@@ -56,8 +56,8 @@ The first deploy is the first run of every path below, so check each one.
 - [ ] `flyio.yml` ends green, and `verify` shows `JWKS publishes keys`.
 - [ ] `curl -s https://miroclone-authservice-dev.fly.dev/.well-known/jwks.json` returns a `keys` array.
 - [ ] `curl -s -o /dev/null -w "%{http_code}\n" https://miroclone-web-dev.fly.dev/health` returns `200`.
-- [ ] A browser request from `https://miroclone-web-dev.fly.dev` is not refused by the origin guard (ADR 0016). `fly logs -a miroclone-web-dev` shows no 403 for the page's own requests.
-- [ ] The Web machine started with the key ring written: `fly ssh console -a miroclone-web-dev -C "ls /data/keys"` lists a `key-*.xml` file. If the directory is not writable, the volume took root ownership: fix it once with `chown app:app /data/keys` over `fly ssh`, then redeploy (ADR 0017).
+- [ ] A browser request from `https://miroclone-web-dev.fly.dev` is not refused by the origin guard (ADR 0018). `fly logs -a miroclone-web-dev` shows no 403 for the page's own requests.
+- [ ] The Web machine started with the key ring written: `fly ssh console -a miroclone-web-dev -C "ls /data/keys"` lists a `key-*.xml` file. If the directory is not writable, the volume took root ownership: fix it once with `chown app:app /data/keys` over `fly ssh`, then redeploy (ADR 0019).
 - [ ] Each service's database holds its own schema, and no role can read another's: `fly ssh console -a miroclone-postgres-dev -C "psql -U miroclone -d postgres -c '\l'"` lists the three databases.
 - [ ] A second `flyio.yml` run with no change deploys nothing (only `verify` runs).
 
@@ -65,24 +65,24 @@ The first deploy is the first run of every path below, so check each one.
 
 Previews are off until the repository variable `FLYIO_PREVIEWS` is `true`. Set it after the dev estate's first deploy, because a preview depends on its PostgreSQL app. Then open a non-draft pull request from a branch of this repository. The preview workflow posts a single comment with the URLs. Closing the pull request
 destroys it. To destroy one by hand, run `flyio-pr-env-destroy.yml` with its number. A preview's first request after idle is a cold start,
-which is accepted for previews (ADR 0019).
+which is accepted for previews (ADR 0021).
 
 ## Operations
 
 - **Roll back:** push a new tag that points at the previous good commit. Tags are never moved or deleted. A rollback is a deploy like any other.
-- **Scale:** not built. Scaling any service past one machine is blocked until its migrations and the Web key ring can share state (ADR 0017,
-  ADR 0018). Do not run `flyctl scale count` on these apps.
+- **Scale:** not built. Scaling any service past one machine is blocked until its migrations and the Web key ring can share state (ADR 0019,
+  ADR 0020). Do not run `flyctl scale count` on these apps.
 - **Destroy the dev estate:** run `flyio-destroy-dev.yml` with `destroy-dev`. Data is kept unless `delete_data` is ticked.
-- **Rotate a database password:** `ALTER ROLE` on the postgres app, then re-stage the secret and redeploy the consumer (ADR 0015).
+- **Rotate a database password:** `ALTER ROLE` on the postgres app, then re-stage the secret and redeploy the consumer (ADR 0017).
 
 ## Not done
 
-- **Scale and manual scale workflow** (fly-io-deployment §12): not built. Blocked by ADR 0017 and ADR 0018.
-- **Shared Data Protection keys across machines:** the key ring is shared across restarts and redeploys, not across machines (ADR 0017).
-- **Scale to zero for the dev estate:** the four dev apps are always on, because every service is on a synchronous path (ADR 0015,
+- **Scale and manual scale workflow** (fly-io-deployment §12): not built. Blocked by ADR 0019 and ADR 0020.
+- **Shared Data Protection keys across machines:** the key ring is shared across restarts and redeploys, not across machines (ADR 0019).
+- **Scale to zero for the dev estate:** the four dev apps are always on, because every service is on a synchronous path (ADR 0017,
   `INFRASTRUCTURE-ANALYSIS.md`).
-- **PostgreSQL over TLS:** the mesh is encrypted, and the image has no certificates. `SSL Mode=Disable` is recorded in ADR 0015.
-- **Cold-start measurement for previews:** not measured, because no preview has run (ADR 0019).
+- **PostgreSQL over TLS:** the mesh is encrypted, and the image has no certificates. `SSL Mode=Disable` is recorded in ADR 0017.
+- **Cold-start measurement for previews:** not measured, because no preview has run (ADR 0021).
 - **Live verification:** no deploy has run, and no Fly or GHCR credential was available. The `docker-build` job proves the three images build in CI. It does not prove they run on Fly.
 
 ## Local checks

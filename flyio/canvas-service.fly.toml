@@ -1,4 +1,4 @@
-# CanvasService for the estate, DEV (ADR 0015). Owns the "canvas" database only (ADR 0003). Holds the canvas aggregate and the hub (WP05). Called by Boards when a board is deleted (ADR 0013).
+# CanvasService for the estate, DEV (ADR 0017). Owns the "canvas" database only (ADR 0003). Holds the canvas aggregate and the hub (WP05). Called by Boards when a board is deleted (ADR 0013).
 app = "miroclone-canvas-dev"
 primary_region = "fra"
 
@@ -14,7 +14,7 @@ primary_region = "fra"
   Auth__Audience = "miro-clone"
 
 # One machine. Migrations run at startup (ADR 0009), so two instances would migrate at once; "immediate" also means a deploy
-# never overlaps an old and a new revision (ADR 0018).
+# never overlaps an old and a new revision (ADR 0020).
 [deploy]
   strategy = "immediate"
 

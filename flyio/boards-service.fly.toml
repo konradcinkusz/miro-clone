@@ -1,4 +1,4 @@
-# BoardsService for the estate, DEV (ADR 0015). Owns the "boards" database only (ADR 0003). The purge of a deleted board's canvas calls this (ADR 0013). Boards does not WaitFor Canvas: the purge is best effort.
+# BoardsService for the estate, DEV (ADR 0017). Owns the "boards" database only (ADR 0003). The purge of a deleted board's canvas calls this (ADR 0013). Boards does not WaitFor Canvas: the purge is best effort.
 app = "miroclone-boards-dev"
 primary_region = "fra"
 
@@ -15,7 +15,7 @@ primary_region = "fra"
   Canvas__BaseUrl = "https://miroclone-canvas-dev.fly.dev/"
 
 # One machine. Migrations run at startup (ADR 0009), so two instances would migrate at once; "immediate" also means a deploy
-# never overlaps an old and a new revision (ADR 0018).
+# never overlaps an old and a new revision (ADR 0020).
 [deploy]
   strategy = "immediate"
 

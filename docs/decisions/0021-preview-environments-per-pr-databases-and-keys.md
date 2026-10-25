@@ -1,4 +1,4 @@
-# 0019 — Preview environments: per-PR apps, databases and role on the shared PostgreSQL, a generated key per preview, and teardown on close
+# 0021 — Preview environments: per-PR apps, databases and role on the shared PostgreSQL, a generated key per preview, and teardown on close
 
 - **Status:** Accepted
 - **Date:** 2026-10-25
@@ -25,7 +25,7 @@ Each non-draft pull request gets its own copy of the estate. The standard leaves
 - **Substrate:** `scripts/flyio-pr-database.sh create|drop <N>` creates or drops `boards_pr_<N>`, `canvas_pr_<N>`, `authservice_pr_<N>`, and the
   role `pr_<N>` that owns all three. The SQL runs through `flyctl ssh console`, base64-encoded, and every statement is idempotent. Each service
   still has its own database. The role is shared by one PR's three databases, which is a deliberate departure from the per-service roles of
-  ADR 0015. It holds only for a disposable PR, and it means no preview role can reach another PR's databases.
+  ADR 0017. It holds only for a disposable PR, and it means no preview role can reach another PR's databases.
 - **Password:** generated per run with `openssl rand -hex 24`, masked, and held in `GITHUB_ENV` for the rest of the job. It is never written
   to the tree or to a secret store.
 - **authservice key:** `openssl genpkey` (PKCS#8, RS256) per run, passed to `flyctl secrets set --stage` and not stored anywhere.

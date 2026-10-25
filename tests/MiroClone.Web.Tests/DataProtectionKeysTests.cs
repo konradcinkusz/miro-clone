@@ -5,7 +5,7 @@ using Xunit;
 
 namespace MiroClone.Web.Tests;
 
-/// <summary>ADR 0017: the Web app persists its Data Protection key ring to DataProtection:KeysPath when it is configured.</summary>
+/// <summary>ADR 0019: the Web app persists its Data Protection key ring to DataProtection:KeysPath when it is configured.</summary>
 public sealed class DataProtectionKeysTests
 {
     [Fact]

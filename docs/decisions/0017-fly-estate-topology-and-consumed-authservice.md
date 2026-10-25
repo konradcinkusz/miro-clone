@@ -1,4 +1,4 @@
-# 0015 — The Fly.io estate: one app per service, a consumed authservice instance, and one PostgreSQL with a role per database
+# 0017 — The Fly.io estate: one app per service, a consumed authservice instance, and one PostgreSQL with a role per database
 
 - **Status:** Accepted
 - **Date:** 2026-10-25
@@ -39,7 +39,7 @@ The standards settle most of the shape. Four points were open and each is decide
 
 - **Owner actions before the first tag:** create the GitHub environment `dev-fly`, set `FLY_API_TOKEN` and the secrets in `flyio/SECRETS.md`,
   and confirm that the four app names are free. `docs/DEPLOYMENT.md` lists them.
-- **Cost:** four always-on machines plus the database, because every application service is on a synchronous path (ADR 0018). `flyio/INFRASTRUCTURE-ANALYSIS.md` gives the figures.
+- **Cost:** four always-on machines plus the database, because every application service is on a synchronous path (ADR 0020). `flyio/INFRASTRUCTURE-ANALYSIS.md` gives the figures.
 - **Trade-off:** the database uses `SSL Mode=Disable`. The 6PN mesh is WireGuard-encrypted, and the image has no TLS certificates. Enabling TLS on the
   image is a later hardening step.
 - **Rotating a role password** is an `ALTER ROLE` by the owner. The init script runs only on an empty volume, so a changed secret does not

@@ -8,7 +8,7 @@ public static class ServiceCollectionExtensions
 {
     /// <summary>
     /// Razor components with the interactive Server render mode (ADR 0001). Typed backend clients arrive with WP05.
-    /// When DataProtection:KeysPath is set, the key ring persists there, so antiforgery tokens survive a restart (ADR 0017).
+    /// When DataProtection:KeysPath is set, the key ring persists there, so antiforgery tokens survive a restart (ADR 0019).
     /// </summary>
     public static IServiceCollection AddWebApp(this IServiceCollection services, IConfiguration configuration)
     {

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Creates or drops one preview environment's databases and login role on the shared dev PostgreSQL (ADR 0019).
+# Creates or drops one preview environment's databases and login role on the shared dev PostgreSQL (ADR 0021).
 #   create <pr-number> <postgres-app>    reads PR_DB_PASSWORD from the environment
 #   drop   <pr-number> <postgres-app>
 # The databases are private (6PN only), so the SQL runs on the postgres machine through flyctl ssh, base64-encoded so the

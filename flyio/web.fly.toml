@@ -1,4 +1,4 @@
-# Web (the BFF) for the estate, DEV (ADR 0001, ADR 0017). Blazor Server: the circuit holds state in memory, so it runs on one
+# Web (the BFF) for the estate, DEV (ADR 0001, ADR 0019). Blazor Server: the circuit holds state in memory, so it runs on one
 # machine, and the Data Protection keys sit on a volume so they survive a restart.
 
 app = "miroclone-web-dev"
@@ -11,13 +11,13 @@ primary_region = "fra"
 [env]
   ASPNETCORE_ENVIRONMENT = "Production"
   ASPNETCORE_URLS = "http://+:8080"
-  # Keys persist here (ADR 0017). Setting this path is what turns persistence on; local runs keep the framework default.
+  # Keys persist here (ADR 0019). Setting this path is what turns persistence on; local runs keep the framework default.
   DataProtection__KeysPath = "/data/keys"
   Auth__Authority = "https://miroclone-authservice-dev.fly.dev"
   Auth__Issuer = "MiroClone"
   Auth__Audience = "miro-clone"
 
-# One machine: a volume is bound to one machine, and circuits are in memory (ADR 0017, ADR 0018).
+# One machine: a volume is bound to one machine, and circuits are in memory (ADR 0019, ADR 0020).
 [deploy]
   strategy = "immediate"
 

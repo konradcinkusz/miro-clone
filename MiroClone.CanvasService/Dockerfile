@@ -1,4 +1,4 @@
-# Production image for MiroClone.CanvasService (WP13, ADR 0015). Build context: the repository root, as flyio/*.fly.toml declares.
+# Production image for MiroClone.CanvasService (WP13, ADR 0017). Build context: the repository root, as flyio/*.fly.toml declares.
 # Stage 1 restores against project files only, so the layer is reused until a project file changes.
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src

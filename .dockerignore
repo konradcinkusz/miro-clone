@@ -1,4 +1,4 @@
-# Build context is the repository root (ADR 0015). Keep local output, history and non-build material out of every image.
+# Build context is the repository root (ADR 0017). Keep local output, history and non-build material out of every image.
 **/bin
 **/obj
 **/.vs

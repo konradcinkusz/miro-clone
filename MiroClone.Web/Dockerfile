@@ -1,4 +1,4 @@
-# Production image for MiroClone.Web (WP13, ADR 0015). Build context: the repository root, as flyio/*.fly.toml declares.
+# Production image for MiroClone.Web (WP13, ADR 0017). Build context: the repository root, as flyio/*.fly.toml declares.
 # Stage 1 restores against project files only, so the layer is reused until a project file changes.
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
@@ -19,7 +19,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 LABEL org.opencontainers.image.source=https://github.com/konradcinkusz/miro-clone
 COPY --from=build /app/publish .
-# Data Protection keys live on the web_keys volume (ADR 0017). The directory must exist and be writable by the app user.
+# Data Protection keys live on the web_keys volume (ADR 0019). The directory must exist and be writable by the app user.
 RUN mkdir -p /data/keys && chown app:app /data/keys
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080

@@ -8,7 +8,7 @@ using Xunit;
 namespace MiroClone.ServiceDefaults.Tests;
 
 /// <summary>
-/// The Fly.io proxy terminates TLS (ADR 0016). The origin guard must see the public https origin, which only the forwarded
+/// The Fly.io proxy terminates TLS (ADR 0018). The origin guard must see the public https origin, which only the forwarded
 /// headers provide, and they must come before the guard in the pipeline.
 /// </summary>
 public sealed class ForwardedHeadersTests : IAsyncLifetime

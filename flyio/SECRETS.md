@@ -28,9 +28,9 @@ Rules for these:
 - **The signing key is this estate's alone.** Never reuse the key of another authservice instance, and never use the local development key
   from `docs/AUTH.md`. Sharing a key shares a trust root (`shared-service-reuse` §1).
 - **The role passwords are read once.** The PostgreSQL init script reads them on the first boot of an empty volume. Changing a secret later does
-  not change the database. Rotate with `ALTER ROLE <role> PASSWORD '…'` on the postgres app, then re-stage the secret (ADR 0015).
+  not change the database. Rotate with `ALTER ROLE <role> PASSWORD '…'` on the postgres app, then re-stage the secret (ADR 0017).
 - The deploy jobs fail when a required secret is empty (`: "${NAME:?…}"`). An ephemeral key would invalidate every token on restart.
-- Preview environments generate their own `PR_DB_PASSWORD` and authservice key on every run. Neither is stored (ADR 0019).
+- Preview environments generate their own `PR_DB_PASSWORD` and authservice key on every run. Neither is stored (ADR 0021).
 
 ## Variables (environment `dev-fly`)
 

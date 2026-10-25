@@ -1,4 +1,4 @@
-# 0016 — Forwarded headers from the Fly proxy are applied, one hop, before the origin guard
+# 0018 — Forwarded headers from the Fly proxy are applied, one hop, before the origin guard
 
 - **Status:** Accepted. Refines ADR 0006 (the guard runs first, and forwarded headers are configured before it).
 - **Date:** 2026-10-25

@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace MiroClone.ServiceDefaults;
 
 /// <summary>
-/// Forwarded headers from the Fly.io proxy (ADR 0016). TLS ends at the proxy, so a request reaches the app as plain http.
+/// Forwarded headers from the Fly.io proxy (ADR 0018). TLS ends at the proxy, so a request reaches the app as plain http.
 /// The origin guard compares the request's scheme and host with the browser's Origin, so these headers must be applied
 /// before it, or every browser request from the public https origin would be refused.
 /// </summary>
