@@ -17,6 +17,7 @@ app.MapStaticAssets();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
+app.UseRateLimiter();
 app.MapAccountEndpoints();
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 app.Run();

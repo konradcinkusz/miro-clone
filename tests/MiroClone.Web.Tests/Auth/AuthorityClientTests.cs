@@ -45,6 +45,29 @@ public sealed class AuthorityClientTests : IDisposable
     }
 
     [Fact]
+    public async Task AnUnreachableAuthserviceIsAFailedAnswerNotAnException()
+    {
+        // A refused connection used to escape as an exception, and the account form answered with a 500 page (ADR 0022).
+        _harness.Authority.Offline = true;
+
+        var result = await _harness.AuthorityClient.LoginAsync("owner@dev.test", "pw-12345678", TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(AuthorityClient.Unreachable, result.Error);
+        Assert.Equal(503, result.Status);
+    }
+
+    [Fact]
+    public async Task ASignInWhileAuthserviceIsDownEndsWithAMessageInTheFlow()
+    {
+        _harness.Authority.Offline = true;
+
+        var outcome = await _harness.Flows.SignInAsync("owner@dev.test", "pw-12345678", TestContext.Current.CancellationToken);
+
+        Assert.Equal(AuthorityClient.Unreachable, outcome.Error);
+    }
+
+    [Fact]
     public async Task AuthserviceErrorMessageIsShownAsItIs()
     {
         _harness.Authority.On(HttpMethod.Post, "api/v1/auth/login", HttpStatusCode.Unauthorized, new { error = "Invalid email or password" });

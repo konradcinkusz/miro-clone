@@ -98,10 +98,13 @@ public sealed class DirectEstate : IAsyncDisposable
         });
         await WaitHealthyAsync(canvasUrl + "/health", canvas);
 
+        // The journeys sign in many times from one loopback address, so the auth limit (ADR 0045) is raised for this estate. The limit
+        // itself is covered by AccountRateLimitingTests, which runs at the production default.
         var web = Start(root, configuration, "MiroClone.Web", webPort, authority, new Dictionary<string, string>
         {
             ["services__boards-service__http__0"] = boardsUrl,
             ["services__canvas-service__http__0"] = canvasUrl,
+            ["RateLimiting__AuthPermitLimit"] = "1000",
         });
         await WaitHealthyAsync(BaseUrl + "/health", web);
     }

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
 
@@ -11,6 +12,9 @@ public sealed class AuthorityClient(HttpClient http)
 {
     /// <summary>Shown when authservice answers with a body this app cannot read.</summary>
     public const string UnreadableReply = "The sign-in service did not answer as expected. Try again.";
+
+    /// <summary>Shown when authservice cannot be reached: a refused connection, a timeout, or an open resilience circuit.</summary>
+    public const string Unreachable = "The account service is not reachable. Try again in a moment.";
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -190,9 +194,22 @@ public sealed class AuthorityClient(HttpClient http)
             request.Options.Set(SessionRequest.SessionId, sessionId);
         }
 
-        using var response = await http.SendAsync(request, ct);
-        var text = await response.Content.ReadAsStringAsync(ct);
-        return new AuthorityReply((int)response.StatusCode, ParseOrNull(text));
+        HttpResponseMessage response;
+        try
+        {
+            response = await http.SendAsync(request, ct);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            // An account form must answer with a message, not an exception: the endpoints redirect with an error (ADR 0022).
+            return AuthorityReply.Unavailable;
+        }
+
+        using (response)
+        {
+            var text = await response.Content.ReadAsStringAsync(ct);
+            return new AuthorityReply((int)response.StatusCode, ParseOrNull(text));
+        }
     }
 
     private static JsonElement? ParseOrNull(string text)
@@ -238,6 +255,8 @@ public sealed class AuthorityClient(HttpClient http)
 
     private sealed record AuthorityReply(int Status, JsonElement? Body)
     {
+        public static AuthorityReply Unavailable { get; } = new(StatusCodes.Status503ServiceUnavailable, null);
+
         public bool Succeeded => Status is >= 200 and < 300;
 
         public AuthorityResult<T> Failure<T>() => AuthorityResult.Failure<T>(Message(), Status);
@@ -250,7 +269,12 @@ public sealed class AuthorityClient(HttpClient http)
             if (Body is not { } body)
             {
                 // A 401 with no body is the bearer handler's answer for a session that has ended.
-                return Status == 401 ? AccountFlows.SessionEnded : UnreadableReply;
+                return Status switch
+                {
+                    401 => AccountFlows.SessionEnded,
+                    StatusCodes.Status503ServiceUnavailable => Unreachable,
+                    _ => UnreadableReply,
+                };
             }
 
             if (Text(body, "error") is { } error)
