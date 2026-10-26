@@ -1,4 +1,4 @@
-# 0019 — The workspace is the token's single organization; with several, the dashboard states the choice is blocked and waits for an authservice change
+# 0024 — The workspace is the token's single organization; with several, the dashboard states the choice is blocked and waits for an authservice change
 
 - **Status:** Accepted as an interim. The owner decision it depends on is open (ADR 0011, "Owner decision needed before WP06").
 - **Date:** 2026-10-25

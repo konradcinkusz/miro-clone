@@ -1,4 +1,4 @@
-# 0011 — Canvas state is a write-behind JSON snapshot, with idempotent DDL and no ORM model
+# 0015 — Canvas state is a write-behind JSON snapshot, with idempotent DDL and no ORM model
 
 - **Status:** Accepted
 - **Date:** 2026-10-25

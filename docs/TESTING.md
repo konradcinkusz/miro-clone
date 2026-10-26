@@ -9,12 +9,14 @@ here**. The results quoted are from the merged pull requests and their CI runs.
 ```bash
 dotnet restore MiroClone.sln
 dotnet build MiroClone.sln                    # 0 warnings: warnings are errors (Directory.Build.props)
-dotnet test --solution MiroClone.sln          # the form the local SDK (10.0.113) accepted in the WP10 run
+dotnet test --solution MiroClone.sln          # the form the SDK pinned in global.json accepts (verified with 10.0.113)
 ```
 
-`AGENTS.md`, `docs/implementation-plan/PROTOCOL.md` and `.github/workflows/pr-validation.yml` write
-`dotnet test MiroClone.sln`. WP10's PR body says the local SDK rejects that form. CI on the same PR still passed, so the
-difference is unexplained (see [COMPLIANCE.md](architecture/COMPLIANCE.md#3a-open-register)).
+The SDK pinned in `global.json` (verified here with 10.0.113) accepts `dotnet test --solution MiroClone.sln` and rejects
+`dotnet test MiroClone.sln` ("should be via `--solution`"). `AGENTS.md` and `PROTOCOL.md` now use the accepted form. CI does not
+use the solution form at all: `pr-validation.yml` runs each unit project with `dotnet test --project`, and the E2E job runs one
+project the same way. The disabled Fly workflow `flyio.yml` still writes the rejected form; it is outside this change (ADR 0026, see
+COMPLIANCE R12).
 
 PostgreSQL tests run only when `TEST_POSTGRES` holds a server connection string, for example
 `Host=localhost;Username=postgres;Password=…`. Each test class creates its own database on that server (`boards_test`,
@@ -42,7 +44,7 @@ PostgreSQL-gated tests). CI passed on the same commit, but its test log was not 
 | Rule | Test | Source |
 |---|---|---|
 | The kernel holds no entity, enum or `DbContext`, and references no `MiroClone.*` assembly | `ServiceDefaults.Tests/ArchitectureTests.cs` | ADR 0005 |
-| Canvas Core has no Blazor or JS types | `Web.Tests/Canvas/Core/CoreIsolationTests.cs` (reads the sources) | ADR 0011 (canvas) |
+| Canvas Core has no Blazor or JS types | `Web.Tests/Canvas/Core/CoreIsolationTests.cs` (reads the sources) | ADR 0029 |
 | The pointer module is one file of at most 60 lines, no import, no network | `Web.Tests/Canvas/Interop/CanvasPointerModuleTests.cs` | ADR 0030 |
 | Colours come only from the token blocks; both themes define the same tokens | `Web.Tests/Style/StyleContractTests.cs` | `blazor-web-app` §9 |
 | Cover pictures use only token colours and no colour keyword | `Web.Tests/Style/PlaceholderContractTests.cs` | ADR 0028 |

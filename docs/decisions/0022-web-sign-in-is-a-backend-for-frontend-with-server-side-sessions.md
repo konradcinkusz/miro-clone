@@ -1,4 +1,4 @@
-# 0017 — Sign-in is a backend-for-frontend: native account forms, tokens in a server-side session, a cookie that names it
+# 0022 — Sign-in is a backend-for-frontend: native account forms, tokens in a server-side session, a cookie that names it
 
 - **Status:** Accepted. The account-page clause (outside the interactive router) is amended by ADR 0042.
 - **Date:** 2026-10-25
@@ -25,7 +25,7 @@ authservice is a credential API, not an OpenID Connect provider: it takes an ema
   a session that ended ends the circuit's sign-in.
 - **Sign-out ends the session everywhere it can.** It calls authservice's logout, which revokes every refresh token of the user (its own
   semantics), then removes the stored session. The network call is best effort; the local session ends regardless.
-- **Data Protection keys are persisted** to a directory (`DataProtection:KeyDirectory`, default `App_Data/keys`, gitignored; a volume in
+- **Data Protection keys are persisted** to a directory (`DataProtection:KeysPath`, default `App_Data/keys`, gitignored; a volume in
   deployment), so a restart does not invalidate open forms or cookies (blazor-web-app §14).
 
 ## Consequences

@@ -1,4 +1,4 @@
-# 0038 — The end-to-end suite is Playwright for .NET, and it starts the estate itself on fixed ports with an empty database
+# 0039 — The end-to-end suite is Playwright for .NET, and it starts the estate itself on fixed ports with an empty database
 
 - **Status:** Accepted. The start decision is amended by ADR 0041: in CI the estate is started from containers and built services, and the AppHost is an opt-in path (`MIROCLONE_E2E_APPHOST=1`).
 - **Date:** 2026-10-26

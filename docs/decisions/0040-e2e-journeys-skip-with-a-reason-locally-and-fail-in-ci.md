@@ -1,4 +1,4 @@
-# 0039 — The browser journeys skip with a reason when a prerequisite is missing, and CI turns the skip into a failure; the unit job runs the unit projects only
+# 0040 — The browser journeys skip with a reason when a prerequisite is missing, and CI turns the skip into a failure; the unit job runs the unit projects only
 
 - **Status:** Accepted
 - **Date:** 2026-10-26

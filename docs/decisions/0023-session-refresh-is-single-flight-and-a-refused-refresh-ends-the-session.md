@@ -1,4 +1,4 @@
-# 0018 — Token refresh is single-flight per session; a refused refresh ends the session, an outage keeps it
+# 0023 — Token refresh is single-flight per session; a refused refresh ends the session, an outage keeps it
 
 - **Status:** Accepted
 - **Date:** 2026-10-25

@@ -16,7 +16,7 @@
 
 ```text
 dotnet build MiroClone.sln     # result:
-dotnet test MiroClone.sln      # result:
+dotnet test --solution MiroClone.sln  # result:
 ```
 
 ## Decisions
