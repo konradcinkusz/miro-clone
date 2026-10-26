@@ -1,4 +1,5 @@
 using Aspire.Hosting;
+using Microsoft.Extensions.Configuration;
 using Aspire.Hosting.ApplicationModel;
 
 namespace MiroClone.AppHost;
@@ -26,7 +27,12 @@ public static class EstateExtensions
         this IDistributedApplicationBuilder builder,
         string repositoryRoot)
     {
-        var postgres = builder.AddPostgres("postgres").WithDataVolume();
+        var postgres = builder.AddPostgres("postgres");
+        if (!builder.Configuration.GetValue<bool>(EphemeralDataKey))
+        {
+            postgres.WithDataVolume();
+        }
+
         var boardsDatabase = postgres.AddDatabase("boards");
         var canvasDatabase = postgres.AddDatabase("canvas");
         var authDatabase = postgres.AddDatabase("authservice-db", "authservice");
@@ -37,7 +43,7 @@ public static class EstateExtensions
         var authService = builder
             .AddContainer("authservice", AuthServiceImage, AuthServiceTag)
             .WithImageRegistry(AuthServiceRegistry)
-            .WithHttpEndpoint(targetPort: 8080, name: "http")
+            .WithHttpEndpoint(port: ConfiguredPort(builder, AuthServicePortKey), targetPort: 8080, name: "http")
             .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development")
             .WithEnvironment("ConnectionStrings__DefaultConnection", authDatabase.Resource.ConnectionStringExpression)
             .WithEnvironment("Jwt__Algorithm", "RS256")
@@ -71,7 +77,7 @@ public static class EstateExtensions
 
         builder
             .AddProject("web", ProjectPath(repositoryRoot, "MiroClone.Web"))
-            .WithHttpEndpoint(env: "ASPNETCORE_HTTP_PORTS")
+            .WithHttpEndpoint(port: ConfiguredPort(builder, WebPortKey), env: "ASPNETCORE_HTTP_PORTS")
             .WithExternalHttpEndpoints()
             .WithReference(boardsService)
             .WaitFor(boardsService)
@@ -95,6 +101,18 @@ public static class EstateExtensions
             .WithEnvironment("Auth__Audience", TokenAudience)
             .WithEnvironment("Auth__RequireHttpsMetadata", "false")
             .WaitFor(authService);
+
+    /// <summary>
+    /// Configuration keys for the end-to-end run (docs/decisions/0039-e2e-suite-is-playwright-dotnet-and-starts-its-own-estate.md).
+    /// Unset, the estate behaves as in development: Aspire assigns the ports and PostgreSQL keeps its data volume.
+    /// </summary>
+    public const string EphemeralDataKey = "Estate:EphemeralData";
+    public const string WebPortKey = "Estate:WebPort";
+    public const string AuthServicePortKey = "Estate:AuthServicePort";
+
+    /// <summary>A fixed host port from configuration, or null so Aspire assigns one.</summary>
+    private static int? ConfiguredPort(IDistributedApplicationBuilder builder, string key) =>
+        builder.Configuration.GetValue<int?>(key);
 
     private static ReferenceExpression AuthorityUrl(IResourceBuilder<ContainerResource> authService) =>
         ReferenceExpression.Create($"{authService.GetEndpoint("http").Property(EndpointProperty.Url)}");

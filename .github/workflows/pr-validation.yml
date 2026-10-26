@@ -51,9 +51,44 @@ jobs:
         if: steps.detect.outputs.has_projects == 'true'
         run: dotnet build MiroClone.sln --no-restore --configuration Release
 
+      # The browser journeys run in their own job (e2e below), so the unit job never starts a browser or the estate. Each unit test
+      # project runs on its own: a filter would leave the excluded project with zero tests, which the runner reports as a failure.
       - name: Test
         if: steps.detect.outputs.has_projects == 'true'
-        run: dotnet test MiroClone.sln --no-build --configuration Release
+        run: |
+          for project in $(git ls-files 'tests/*.csproj' | grep -v -e 'MiroClone.Web.E2E' -e 'MiroClone.TestSupport'); do
+            dotnet test --project "$project" --no-build --configuration Release
+          done
+
+  # Browser journeys against the whole estate, started by the suite from the AppHost (WP12, ADR 0039). Docker is on the runner,
+  # so PostgreSQL and the pinned authservice image run here. MIROCLONE_E2E_REQUIRED makes a missing browser or Docker fail the job
+  # instead of skipping the journeys.
+  e2e:
+    name: e2e (browser journeys)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      MIROCLONE_E2E_REQUIRED: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET SDK from global.json
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore MiroClone.sln
+
+      - name: Build
+        run: dotnet build MiroClone.sln --no-restore --configuration Release
+
+      - name: Install Chromium for Playwright
+        run: pwsh tests/MiroClone.Web.E2E/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+      - name: Journeys
+        run: dotnet test --project tests/MiroClone.Web.E2E/MiroClone.Web.E2E.csproj --no-build --configuration Release
 
   # Builds each service image without pushing it. A Dockerfile that breaks is caught here, not at the tag (WP13).
   docker-build:

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Browser journeys against the running estate (WP12, ADR 0038). Playwright for .NET, so the repository keeps no Node toolchain
+    (ADR 0001). Runs in its own CI job, never in the unit job. Skips with a reason when no browser or no Docker is available.
+  -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <OutputType>Exe</OutputType>
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+    <RootNamespace>MiroClone.Web.E2E</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Microsoft.Playwright" />
+    <PackageReference Include="xunit.v3" />
+  </ItemGroup>
+
+</Project>
