@@ -1,4 +1,5 @@
-# Tag-driven deploy to Fly.io (WP13, fly-io-deployment §10). A v* tag is the act of deploying.
+# DISABLED by owner decision: no Fly.io deployment. Automatic triggers removed; manual dispatch only.
+# Tag-driven deploy to Fly.io (WP13, fly-io-deployment §10). Pushing a v* tag no longer deploys (ADR 0026).
 #   test -> detect -> build (once per image) -> postgres -> authservice -> canvas -> boards -> web -> verify
 # Images are built once and deployed with --image. A service whose Fly app is missing is always selected, so a cold
 # estate comes up from one tag. The PostgreSQL app is gated on its own config (fly-io-deployment §10).
@@ -6,8 +7,6 @@
 name: flyio
 
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
     inputs:
       force_full_redeploy:

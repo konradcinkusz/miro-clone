@@ -1,12 +1,10 @@
-# Teardown of a pull request's preview estate (WP13, pr-preview-environments §5). Two triggers:
-#   1. automatic, when the PR closes (merged or not);
-#   2. manual, with a PR number, for orphans left by a workflow bug or a renamed app.
+# DISABLED by owner decision: no Fly.io deployment. Automatic triggers removed; manual dispatch only.
+# Teardown of a pull request's preview estate (WP13, pr-preview-environments §5). Closing a PR no longer runs it (ADR 0026).
+# Manual trigger only, with a PR number, for orphans left by a workflow bug or a renamed app.
 # Every step is idempotent: a missing app or database is a skip, so a half-destroyed preview can be destroyed again.
 name: flyio-pr-env-destroy
 
 on:
-  pull_request:
-    types: [closed]
   workflow_dispatch:
     inputs:
       pr_number:

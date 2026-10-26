@@ -1,3 +1,4 @@
+# DISABLED by owner decision: no Fly.io deployment. Automatic triggers removed; manual dispatch only.
 # Manual teardown of the dev estate on Fly.io (WP13, fly-io-deployment §12). Behind a typed confirmation.
 # Apps are destroyed in reverse dependency order. The PostgreSQL app and its data are kept unless delete_data is ticked,
 # because a destroyed app takes its volume with it.
