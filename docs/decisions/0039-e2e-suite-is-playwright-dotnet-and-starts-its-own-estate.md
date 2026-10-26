@@ -1,6 +1,6 @@
 # 0038 — The end-to-end suite is Playwright for .NET, and it starts the estate itself on fixed ports with an empty database
 
-- **Status:** Accepted
+- **Status:** Accepted. The start decision is amended by ADR 0041: in CI the estate is started from containers and built services, and the AppHost is an opt-in path (`MIROCLONE_E2E_APPHOST=1`).
 - **Date:** 2026-10-26
 - **Principles:** blazor-web-app §1 and §13 (no Node toolchain in a .NET Blazor repository; journeys wait for the circuit, use test ids and roles, and run in their own job); e2e-acceptance-testing §3 (locator convention), §5 (independence and cleanup decided per environment), §6 (CI wiring is part of done); testing-strategy §4 (ephemeral environments for E2E); ADR 0001 (no Node toolchain); ADR 0011 (the signing key is per instance and never in the tree)
 

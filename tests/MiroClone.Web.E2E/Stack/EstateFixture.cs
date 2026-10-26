@@ -23,12 +23,14 @@ public sealed class EstateFixture : IAsyncLifetime
     public const string AuthServiceContainerVariable = "MIROCLONE_E2E_AUTHSERVICE_CONTAINER";
     public const string ChromiumVariable = "MIROCLONE_E2E_CHROMIUM";
     public const string RequiredVariable = "MIROCLONE_E2E_REQUIRED";
+    public const string AppHostVariable = "MIROCLONE_E2E_APPHOST";
 
     /// <summary>The pinned authservice image (AppHost EstateExtensions). The dev outbox is read from its container log.</summary>
     private const string AuthServiceImage = "ghcr.io/konradcinkusz/authservice:v0.3.4";
     private static readonly TimeSpan StartupLimit = TimeSpan.FromMinutes(12);
 
     private Process? _apphost;
+    private DirectEstate? _direct;
     private IPlaywright? _playwright;
     private string? _skipReason;
 
@@ -85,8 +87,22 @@ public sealed class EstateFixture : IAsyncLifetime
                 return;
             }
 
-            await StartEstateAsync();
-            AuthServiceContainer = await FindAuthServiceContainerAsync();
+            await PullAuthServiceImageAsync();
+            if (Environment.GetEnvironmentVariable(AppHostVariable) == "1")
+            {
+                await StartEstateAsync();
+                AuthServiceContainer = await FindAuthServiceContainerAsync() ?? string.Empty;
+            }
+            else
+            {
+                // Default (ADR 0041): containers for PostgreSQL and authservice, the services from their built output.
+                _direct = new DirectEstate();
+                await _direct.StartAsync();
+                BaseUrl = _direct.BaseUrl;
+                AuthServiceUrl = _direct.AuthServiceUrl;
+                AuthServiceContainer = _direct.AuthServiceContainer;
+                return;
+            }
         }
 
         // The web app waits for authservice in the AppHost, so its health implies both. A supplied estate may lack authservice, and
@@ -144,6 +160,11 @@ public sealed class EstateFixture : IAsyncLifetime
 
         _playwright?.Dispose();
 
+        if (_direct is not null)
+        {
+            await _direct.DisposeAsync();
+        }
+
         if (_apphost is not null)
         {
             if (!_apphost.HasExited)
@@ -170,9 +191,6 @@ public sealed class EstateFixture : IAsyncLifetime
         var webPort = FreePort();
         var authPort = FreePort();
         var project = Path.Combine(RepositoryRoot(), "MiroClone.AppHost", "MiroClone.AppHost.csproj");
-        // Pulled here, not by the AppHost, so a registry refusal shows its own message in the log instead of a stalled start.
-        await PullAuthServiceImageAsync();
-
         // No --configuration: the Aspire CLI that dotnet run hands the AppHost to starts its bin/Debug build, and dotnet run
         // builds that when it is missing. A Release-only build of the AppHost makes the start fail.
         var start = new ProcessStartInfo("dotnet") { UseShellExecute = false };
@@ -233,7 +251,7 @@ public sealed class EstateFixture : IAsyncLifetime
     /// Prints what a failed start leaves behind, so the CI log says why: the containers and their recent logs, and the tail of the
     /// newest Aspire CLI log. Nothing here changes the outcome.
     /// </summary>
-    private static async Task DumpDiagnosticsAsync()
+    internal static async Task DumpDiagnosticsAsync()
     {
         Console.WriteLine("--- estate diagnostics ---");
         Console.WriteLine(await RunAsync("docker", "ps", "-a", "--format", "{{.Names}} | {{.Image}} | {{.Status}}"));
