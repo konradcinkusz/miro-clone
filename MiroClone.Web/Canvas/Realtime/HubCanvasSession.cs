@@ -9,7 +9,7 @@ using MiroClone.Web.Canvas.Editing;
 namespace MiroClone.Web.Canvas.Realtime;
 
 /// <summary>
-/// The circuit's live copy of one board, joined to the canvas hub (ADR 0033, ADR 0034). Local edits apply at once and are
+/// The circuit's live copy of one board, joined to the canvas hub (ADR 0035, ADR 0036). Local edits apply at once and are
 /// sent in order from an outbox. The room's edits are applied through <see cref="MutationApplier"/>. When the connection
 /// drops, the session retries with backoff and re-reads the board; edits made while it was down are replayed on top of
 /// the re-read state. A mutation the service refuses is dropped and the board is re-read, so the service's state wins.
@@ -20,7 +20,7 @@ namespace MiroClone.Web.Canvas.Realtime;
 /// </remarks>
 public sealed partial class HubCanvasSession : IRealtimeCanvasSession, ICanvasHubListener
 {
-    /// <summary>The least gap between two presence sends: at most 20 a second (ADR 0034).</summary>
+    /// <summary>The least gap between two presence sends: at most 20 a second (ADR 0036).</summary>
     public static readonly TimeSpan PresencePace = TimeSpan.FromMilliseconds(50);
 
     /// <summary>How long the outbox waits before it tries a rate-limited edit again.</summary>

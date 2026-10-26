@@ -164,7 +164,7 @@ else if (session is { } live && editor is not null && frame is not null)
 
     private void HandleInput(CanvasInput input)
     {
-        // The cursor is read off the camera before the input applies, so it is where the pointer is (ADR 0034).
+        // The cursor is read off the camera before the input applies, so it is where the pointer is (ADR 0036).
         if (input is PointerInput pointer && editor is not null)
         {
             cursor = editor.Camera.ScreenToWorld(pointer.Screen);
@@ -221,7 +221,7 @@ else if (session is { } live && editor is not null && frame is not null)
         StateHasChanged();
     });
 
-    /// <summary>Tells the room where this user's pointer is and what is selected (ADR 0034). The session paces the sends.</summary>
+    /// <summary>Tells the room where this user's pointer is and what is selected (ADR 0036). The session paces the sends.</summary>
     private void Announce() => session?.SetPresence(cursor, frame?.Selection ?? []);
 
     private async Task CloseSessionAsync()

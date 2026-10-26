@@ -5,7 +5,7 @@ using MiroClone.Web.Api;
 namespace MiroClone.Web.Canvas.Realtime;
 
 /// <summary>
-/// The SignalR client for the canvas hub, run by the circuit (ADR 0035). The bearer token is read from the session service
+/// The SignalR client for the canvas hub, run by the circuit (ADR 0037). The bearer token is read from the session service
 /// for each request and never reaches the browser. The transports are server-sent events and long polling, because the
 /// WebSocket transport opens its own socket and would bypass the service-discovery handler that resolves the service name.
 /// </summary>
