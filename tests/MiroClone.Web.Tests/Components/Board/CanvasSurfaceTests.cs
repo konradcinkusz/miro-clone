@@ -10,7 +10,7 @@ using Xunit;
 
 namespace MiroClone.Web.Tests.Components.Board;
 
-/// <summary>The surface draws a frame and hands input up. Pointer capture and coordinates are the browser's job (ADR 0027).</summary>
+/// <summary>The surface draws a frame and hands input up. Pointer capture and coordinates are the browser's job (ADR 0030).</summary>
 public sealed class CanvasSurfaceTests : BunitContext
 {
     private readonly FakeCanvasPointer _pointer = new();

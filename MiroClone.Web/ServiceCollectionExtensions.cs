@@ -106,7 +106,7 @@ public static class ServiceCollectionExtensions
         services.AddHttpClient<CanvasClient>(http => http.BaseAddress = new Uri("http://canvas-service/"))
             .AddHttpMessageHandler<BearerTokenHandler>();
 
-        // The board surface's pointer input (ADR 0027). One per circuit; the surface disposes it with the page.
+        // The board surface's pointer input (ADR 0030). One per circuit; the surface disposes it with the page.
         services.AddTransient<ICanvasPointerSource, JsCanvasPointerSource>();
     }
 }

@@ -1,4 +1,4 @@
-# 0029 — The board's title comes from walking the boards list; a single-board read is a contract change, not made here
+# 0032 — The board's title comes from walking the boards list; a single-board read is a contract change, not made here
 
 - **Status:** Accepted
 - **Date:** 2026-10-26

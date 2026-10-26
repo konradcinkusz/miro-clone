@@ -7,7 +7,7 @@ namespace MiroClone.Web.Canvas.Interop;
 
 /// <summary>
 /// The browser side of <see cref="ICanvasPointerSource"/>. It loads <c>wwwroot/js/canvas-pointer.js</c>, the only script in the app
-/// (ADR 0027), and receives its messages on the circuit. The JavaScript keeps no state: it reports phases, coordinates and buttons.
+/// (ADR 0030), and receives its messages on the circuit. The JavaScript keeps no state: it reports phases, coordinates and buttons.
 /// </summary>
 public sealed class JsCanvasPointerSource(IJSRuntime js) : ICanvasPointerSource
 {

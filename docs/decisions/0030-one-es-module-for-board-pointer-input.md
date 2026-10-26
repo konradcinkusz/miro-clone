@@ -1,4 +1,4 @@
-# 0027 — One ES module of at most 60 lines carries the board's pointer input; no JavaScript package
+# 0030 — One ES module of at most 60 lines carries the board's pointer input; no JavaScript package
 
 - **Status:** Accepted
 - **Date:** 2026-10-26

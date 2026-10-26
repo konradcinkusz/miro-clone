@@ -395,7 +395,7 @@ public sealed class BoardEditor
         return Bounds.Union(boxes);
     }
 
-    /// <summary>Handles show for one selected layer that is not a path (ADR 0028: the same rule as the web canvas today).</summary>
+    /// <summary>Handles show for one selected layer that is not a path (ADR 0031: the same rule as the web canvas today).</summary>
     private bool CanResize() =>
         _selection is [var only] && _session.Document.TryGet(only, out var layer) && layer.Type != LayerType.Path;
 

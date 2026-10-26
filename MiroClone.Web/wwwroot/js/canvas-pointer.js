@@ -1,4 +1,4 @@
-// Pointer capture, coordinates and wheel for the board surface (ADR 0027). The only JavaScript in the app. It forwards
+// Pointer capture, coordinates and wheel for the board surface (ADR 0030). The only JavaScript in the app. It forwards
 // events to the circuit and keeps no state: every rule about the canvas lives in C#.
 
 export function attach(surface, target) {

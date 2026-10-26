@@ -1,4 +1,4 @@
-# 0028 — Board edits go through ICanvasSession; each gesture commits one undo step; the editor is plain C# over Core
+# 0031 — Board edits go through ICanvasSession; each gesture commits one undo step; the editor is plain C# over Core
 
 - **Status:** Accepted
 - **Date:** 2026-10-26
