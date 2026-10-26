@@ -201,6 +201,29 @@ public sealed class HubCanvasSessionTests
     }
 
     [Fact]
+    public async Task AnOutboxAtItsCapRefusesNewEditsUntilTheConnectionTakesSome()
+    {
+        // Offline, the edits queue. At the cap the session refuses the next one before it touches the document, so the room
+        // never misses an edit the page shows (ADR 0035).
+        var server = new FakeHubConnector { StartError = new IOException("unreachable") };
+        await using var session = Open(server, retry: Quick, maximumOutbox: 2);
+        session.Start();
+        session.Commit([LayerMutation.Upsert(Layer(A))]);
+        session.Commit([LayerMutation.Upsert(Layer(B))]);
+        Assert.True(session.EditsPaused);
+
+        var refused = session.Commit([LayerMutation.Upsert(Layer(C))]);
+
+        Assert.Empty(refused);
+        Assert.False(session.Document.TryGet(C, out _));
+
+        server.StartError = null;
+        await Eventually.AssertAsync(() => !session.EditsPaused, "the outbox to drain once the connection returns");
+        Assert.Equal(2, server.Latest.Sent.Count);
+        Assert.Single(session.Commit([LayerMutation.Upsert(Layer(C))]));
+    }
+
+    [Fact]
     public async Task WithoutASignInTheSessionDoesNotConnectAndSaysUnavailable()
     {
         var server = new FakeHubConnector();
@@ -381,7 +404,8 @@ public sealed class HubCanvasSessionTests
         FakeHubConnector server,
         TimeSpan retry,
         Func<CancellationToken, Task<string?>>? token = null,
-        SynchronizationContext? dispatcher = null) =>
+        SynchronizationContext? dispatcher = null,
+        int? maximumOutbox = null) =>
         new(
             Board,
             Self,
@@ -392,7 +416,8 @@ public sealed class HubCanvasSessionTests
             TimeProvider.System,
             dispatcher,
             logger: null,
-            retryDelay: retry);
+            retryDelay: retry,
+            maximumOutbox: maximumOutbox ?? HubCanvasSession.DefaultMaximumOutbox);
 
     private static Layer Layer(Guid id) => new(id, LayerType.Rectangle, 0, 0, 10, 10, new Rgb(1, 2, 3));
 }

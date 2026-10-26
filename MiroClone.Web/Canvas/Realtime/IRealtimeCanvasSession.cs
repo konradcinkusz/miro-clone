@@ -30,6 +30,9 @@ public interface IRealtimeCanvasSession : ICanvasSession
 {
     CanvasConnectionState Connection { get; }
 
+    /// <summary>True while too many edits are waiting for the connection, so new local edits are refused (ADR 0035).</summary>
+    bool EditsPaused { get; }
+
     /// <summary>Everyone on the board, the signed-in user first and each user once.</summary>
     IReadOnlyList<ParticipantView> Participants { get; }
 
