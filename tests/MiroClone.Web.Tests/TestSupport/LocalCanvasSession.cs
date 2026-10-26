@@ -3,8 +3,7 @@ using MiroClone.Web.Canvas.Core;
 namespace MiroClone.Web.Canvas.Editing;
 
 /// <summary>
-/// The in-memory session: the layers loaded once over REST, edited in this circuit only. Nothing is sent anywhere, so a reload
-/// returns the layers the service last stored until WP10 sends local edits to the hub.
+/// The in-memory session the editor tests use: the layers are edited in memory and nothing is sent anywhere.
 /// </summary>
 public sealed class LocalCanvasSession(CanvasDocument document) : ICanvasSession
 {
