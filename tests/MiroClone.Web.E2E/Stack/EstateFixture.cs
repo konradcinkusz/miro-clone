@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
-using System.Reflection;
 using System.Security.Cryptography;
 using Microsoft.Playwright;
 using Xunit;
@@ -171,7 +170,11 @@ public sealed class EstateFixture : IAsyncLifetime
         var webPort = FreePort();
         var authPort = FreePort();
         var project = Path.Combine(RepositoryRoot(), "MiroClone.AppHost", "MiroClone.AppHost.csproj");
-        var configuration = typeof(EstateFixture).Assembly.GetCustomAttribute<AssemblyConfigurationAttribute>()?.Configuration ?? "Debug";
+#if RELEASE
+        const string configuration = "Release";
+#else
+        const string configuration = "Debug";
+#endif
 
         var start = new ProcessStartInfo("dotnet") { UseShellExecute = false };
         foreach (var argument in new[] { "run", "--project", project, "--configuration", configuration })
