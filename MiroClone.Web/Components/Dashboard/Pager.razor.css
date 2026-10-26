@@ -1,0 +1,12 @@
+.pager {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+}
+
+.pager [aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

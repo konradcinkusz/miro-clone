@@ -1,0 +1,21 @@
+.dialog-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--gutter);
+    background: var(--color-shadow);
+}
+
+.dialog {
+    width: min(28rem, 100%);
+    max-height: 100%;
+    overflow-y: auto;
+}
+
+.dialog :deep(.dialog-actions) {
+    justify-content: flex-end;
+    margin-top: var(--space-4);
+}

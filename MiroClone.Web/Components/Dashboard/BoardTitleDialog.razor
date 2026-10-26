@@ -1,0 +1,80 @@
+@* Creates or renames a board. The title is checked before it is sent; the service's own answer is shown in Error. *@
+<Dialog Title="@Heading" TestId="@TestId" OnClose="OnCancel">
+    <form @onsubmit="Submit" @onsubmit:preventDefault="true" novalidate data-testid="board-title-form">
+        <div class="field">
+            <label for="@_inputId">Board title</label>
+            <input id="@_inputId" type="text" autocomplete="off" autofocus disabled="@Busy"
+                   value="@_title" @oninput="OnTitleInput"
+                   aria-invalid="@(_attempted && _error is not null ? "true" : "false")"
+                   aria-describedby="@_helpId" data-testid="board-title-input" />
+            @if (_attempted && _error is { } message)
+            {
+                <p class="callout callout-danger" role="alert" id="@_helpId" data-testid="board-title-error">@message</p>
+            }
+            else
+            {
+                <p class="muted" id="@_helpId">Between 1 and @BoardTitle.MaxLength characters.</p>
+            }
+        </div>
+
+        <StatusAlert Message="@Error" />
+
+        <div class="cluster dialog-actions">
+            <button type="button" class="btn" disabled="@Busy" @onclick="OnCancel">Cancel</button>
+            <button type="submit" class="btn btn-primary" disabled="@Busy" data-testid="board-title-submit">@SubmitLabel</button>
+        </div>
+    </form>
+</Dialog>
+
+@code {
+    private readonly string _inputId = $"board-title-{Guid.NewGuid():N}";
+    private readonly string _helpId = $"board-title-help-{Guid.NewGuid():N}";
+    private string _title = string.Empty;
+    private string? _error;
+    private bool _attempted;
+
+    [Parameter, EditorRequired]
+    public string Heading { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string SubmitLabel { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Initial { get; set; }
+
+    [Parameter]
+    public string? TestId { get; set; }
+
+    [Parameter]
+    public bool Busy { get; set; }
+
+    [Parameter]
+    public string? Error { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback<string> OnSubmit { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback OnCancel { get; set; }
+
+    protected override void OnInitialized()
+    {
+        _title = Initial ?? string.Empty;
+        _error = BoardTitle.Error(_title);
+    }
+
+    private void OnTitleInput(ChangeEventArgs e)
+    {
+        _title = e.Value?.ToString() ?? string.Empty;
+        _error = BoardTitle.Error(_title);
+    }
+
+    private async Task Submit()
+    {
+        _attempted = true;
+        if (BoardTitle.Normalize(_title) is { } title)
+        {
+            await OnSubmit.InvokeAsync(title);
+        }
+    }
+}

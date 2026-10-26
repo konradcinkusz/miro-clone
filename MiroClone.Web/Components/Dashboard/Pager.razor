@@ -1,0 +1,42 @@
+@* Previous and next as links, so the page number lives in the address. Hidden when every board fits on one page. *@
+@{
+    var pages = BoardQuery.PageCount(Total);
+}
+@if (pages > 1)
+{
+    <nav class="pager" aria-label="Board pages" data-testid="pager">
+        @if (BoardQuery.HasPrevious(Page))
+        {
+            <a class="btn" href="@BoardQuery.Url(Search, Favourites, Page - 1)" data-testid="page-previous">Previous</a>
+        }
+        else
+        {
+            <span class="btn" aria-disabled="true">Previous</span>
+        }
+
+        <span class="muted" data-testid="page-status">Page @Page of @pages</span>
+
+        @if (BoardQuery.HasNext(Page, Total))
+        {
+            <a class="btn" href="@BoardQuery.Url(Search, Favourites, Page + 1)" data-testid="page-next">Next</a>
+        }
+        else
+        {
+            <span class="btn" aria-disabled="true">Next</span>
+        }
+    </nav>
+}
+
+@code {
+    [Parameter]
+    public string? Search { get; set; }
+
+    [Parameter]
+    public bool Favourites { get; set; }
+
+    [Parameter]
+    public int Page { get; set; } = 1;
+
+    [Parameter]
+    public int Total { get; set; }
+}
