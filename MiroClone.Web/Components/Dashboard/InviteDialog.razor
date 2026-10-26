@@ -1,0 +1,49 @@
+@* Sends an invitation to join the workspace as a member. authservice sends the email; the page never sees the invitation token. *@
+<Dialog Title="Invite members" TestId="invite-dialog" OnClose="OnCancel">
+    <p class="muted">Invite someone to @OrganizationName as a member. They join when they accept the email.</p>
+
+    <form @onsubmit="Submit" @onsubmit:preventDefault="true" novalidate>
+        <div class="field">
+            <label for="@_inputId">Email address</label>
+            <input id="@_inputId" type="email" autocomplete="email" autofocus disabled="@Busy"
+                   value="@_email" @oninput="e => _email = e.Value?.ToString() ?? string.Empty" data-testid="invite-email" />
+        </div>
+
+        <StatusAlert Message="@Error" />
+
+        @if (Notice is { } notice)
+        {
+            <p class="callout callout-success" role="status" data-testid="invite-notice">@notice</p>
+        }
+
+        <div class="cluster dialog-actions">
+            <button type="button" class="btn" disabled="@Busy" @onclick="OnCancel">Close</button>
+            <button type="submit" class="btn btn-primary" disabled="@Busy" data-testid="invite-submit">Send invitation</button>
+        </div>
+    </form>
+</Dialog>
+
+@code {
+    private readonly string _inputId = $"invite-email-{Guid.NewGuid():N}";
+    private string _email = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string OrganizationName { get; set; } = string.Empty;
+
+    [Parameter]
+    public bool Busy { get; set; }
+
+    [Parameter]
+    public string? Error { get; set; }
+
+    [Parameter]
+    public string? Notice { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback<string> OnInvite { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback OnCancel { get; set; }
+
+    private Task Submit() => OnInvite.InvokeAsync(_email.Trim());
+}

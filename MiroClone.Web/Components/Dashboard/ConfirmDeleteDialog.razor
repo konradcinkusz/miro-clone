@@ -1,0 +1,28 @@
+@* Asks before a board is deleted. Nothing is sent until the user confirms. *@
+<Dialog Title="Delete board?" TestId="confirm-delete" OnClose="OnCancel">
+    <p>This will delete <strong>@Name</strong> and all its contents.</p>
+
+    <StatusAlert Message="@Error" />
+
+    <div class="cluster dialog-actions">
+        <button type="button" class="btn" disabled="@Busy" @onclick="OnCancel">Cancel</button>
+        <button type="button" class="btn btn-primary" disabled="@Busy" data-testid="confirm-delete-submit" @onclick="OnConfirm">Delete board</button>
+    </div>
+</Dialog>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Name { get; set; } = string.Empty;
+
+    [Parameter]
+    public bool Busy { get; set; }
+
+    [Parameter]
+    public string? Error { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback OnConfirm { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback OnCancel { get; set; }
+}

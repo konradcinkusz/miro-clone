@@ -1,84 +1,208 @@
 @page "/"
 @attribute [Authorize]
+@using MiroClone.ServiceDefaults
 @using MiroClone.Web.Api
 @using MiroClone.Web.Auth
+@using MiroClone.Web.Components.Dashboard
 @using MiroClone.Web.Components.Shared
 @inject ICurrentSession Session
 @inject AuthorityClient Authority
 @inject BoardsClient Boards
 @inject NavigationManager Navigation
+@implements IDisposable
 
-<PageTitle>Boards · MiroClone</PageTitle>
+<PageTitle>@Heading · MiroClone</PageTitle>
 
-<section class="stack" aria-labelledby="boards-heading">
-    <h1 id="boards-heading">Boards</h1>
+<div class="dashboard">
+    <Sidebar WorkspaceName="@WorkspaceName()" Favourites="@Favourites" />
 
-    <StatusAlert Message="@error" />
-
-    @if (!loaded)
-    {
-        <p class="muted" role="status" data-testid="dashboard-loading">Loading your workspace…</p>
-    }
-    else
-    {
-        @switch (state?.Kind)
+    <section class="dashboard-main stack" aria-labelledby="boards-heading">
+        @if (!loaded)
         {
-            case WorkspaceKind.Active:
-                <p class="muted" data-testid="workspace-name">Workspace: @WorkspaceName()</p>
-                @if (boards is { Items.Count: 0 })
-                {
-                    <div class="empty-state" data-testid="boards-empty">
-                        <h2>No boards yet</h2>
-                        <p>Boards created in this workspace appear here.</p>
-                    </div>
-                }
-                else if (boards is not null)
-                {
-                    <p data-testid="boards-total">@boards.Total boards in this workspace.</p>
-                }
-                break;
-
-            case WorkspaceKind.ChooseOne:
-                <section class="callout callout-warning" data-testid="workspace-choose" aria-labelledby="choose-heading">
-                    <h2 id="choose-heading">Choose a workspace</h2>
-                    <p>
-                        You belong to @(state?.MembershipCount ?? 0) workspaces, and this session has none active. authservice does not yet
-                        issue a token for one organization (ADR 0011), so boards stay closed until it does.
-                    </p>
-                    <ul class="plain-list">
-                        @foreach (var organization in organizations)
-                        {
-                            <li>@organization.Name <span class="muted">(@organization.Role)</span></li>
-                        }
-                    </ul>
-                </section>
-                break;
-
-            case WorkspaceKind.NoWorkspace:
-                <section class="callout callout-warning" data-testid="workspace-none" aria-labelledby="none-heading">
-                    <h2 id="none-heading">No workspace yet</h2>
-                    <p>
-                        Your account does not belong to a workspace. Ask an owner to invite you, or create one in authservice, then sign
-                        in again so your session carries it.
-                    </p>
-                </section>
-                break;
+            <h1 id="boards-heading">Boards</h1>
+            <p class="muted" role="status" data-testid="dashboard-loading">Loading your workspace…</p>
         }
-    }
-</section>
+        else
+        {
+            <h1 id="boards-heading" data-testid="dashboard-heading">@Heading</h1>
+
+            <div class="cluster dashboard-toolbar">
+                <div class="field dashboard-search">
+                    <label for="board-search">Search boards</label>
+                    <input id="board-search" type="search" autocomplete="off" value="@searchText"
+                           disabled="@(!IsActive)" @oninput="OnSearchInput" data-testid="board-search" />
+                </div>
+                @if (IsActive && Membership.CanInvite(ActiveRole()))
+                {
+                    <button type="button" class="btn" data-testid="invite-open" @onclick="OpenInvite">Invite members</button>
+                }
+            </div>
+
+            <StatusAlert Message="@error" />
+
+            @if (notice is not null)
+            {
+                <p class="callout callout-success" role="status" data-testid="dashboard-notice">@notice</p>
+            }
+
+            @switch (state?.Kind)
+            {
+                case WorkspaceKind.Active:
+                    @if (boards is null)
+                    {
+                        <ul class="board-grid" aria-busy="true" data-testid="boards-loading">
+                            @for (var i = 0; i < 4; i++)
+                            {
+                                <li class="board-card-skeleton" aria-hidden="true"></li>
+                            }
+                        </ul>
+                    }
+                    else if (boards.Items.Count == 0 && !string.IsNullOrEmpty(BoardQuery.Search(Search)))
+                    {
+                        <div class="empty-state" data-testid="search-empty">
+                            <h2>No results found.</h2>
+                            <p>Try searching for something else.</p>
+                        </div>
+                    }
+                    else if (boards.Items.Count == 0 && Favourites)
+                    {
+                        <div class="empty-state" data-testid="favourites-empty">
+                            <h2>No favourite boards.</h2>
+                            <p>Try favouriting a board.</p>
+                        </div>
+                    }
+                    else if (boards.Items.Count == 0)
+                    {
+                        <div class="empty-state" data-testid="boards-empty">
+                            <h2>Create your first board.</h2>
+                            <p>Start by creating a board for your workspace.</p>
+                            <button type="button" class="btn btn-primary" data-testid="empty-create" @onclick="OpenCreate">Create board</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="muted" data-testid="boards-total">@boards.Total @(boards.Total == 1 ? "board" : "boards") in this workspace.</p>
+                        <ul class="board-grid" data-testid="board-grid">
+                            <li>
+                                <button type="button" class="board-new" data-testid="new-board" @onclick="OpenCreate">
+                                    <span class="board-new-plus" aria-hidden="true">+</span>
+                                    <span>New board</span>
+                                </button>
+                            </li>
+                            @foreach (var board in boards.Items)
+                            {
+                                <li>
+                                    <BoardCard Board="board" CurrentUserId="@currentUser" Busy="@(busyBoard == board.Id)"
+                                               OnFavourite="ToggleFavouriteAsync" OnRename="OpenRename" OnDelete="OpenDelete" />
+                                </li>
+                            }
+                        </ul>
+                        <Pager Search="@Search" Favourites="@Favourites" Page="@BoardQuery.Page(Page)" Total="@boards.Total" />
+                    }
+                    break;
+
+                case WorkspaceKind.ChooseOne:
+                    <section class="callout callout-warning" data-testid="workspace-choose" aria-labelledby="choose-heading">
+                        <h2 id="choose-heading">Choose a workspace</h2>
+                        <p>
+                            You belong to @(state?.MembershipCount ?? 0) workspaces, and this session has none active. Boards stay
+                            closed until a session is issued for one of them. Sign in again after your membership changes.
+                        </p>
+                        <ul class="plain-list">
+                            @foreach (var organization in organizations)
+                            {
+                                <li>@organization.Name <span class="muted">(@organization.Role)</span></li>
+                            }
+                        </ul>
+                    </section>
+                    break;
+
+                case WorkspaceKind.NoWorkspace:
+                    <section class="callout callout-warning" data-testid="workspace-none" aria-labelledby="none-heading">
+                        <h2 id="none-heading">No workspace yet</h2>
+                        <p>
+                            Your account does not belong to a workspace. Ask an owner to invite you, or create one in authservice, then sign
+                            in again so your session carries it.
+                        </p>
+                    </section>
+                    break;
+            }
+
+            @if (createOpen)
+            {
+                <BoardTitleDialog Heading="New board" SubmitLabel="Create board" TestId="new-board-dialog" Busy="@dialogBusy"
+                                  Error="@dialogError" OnSubmit="CreateBoardAsync" OnCancel="CloseDialogs" />
+            }
+
+            @if (renameTarget is { } rename)
+            {
+                <BoardTitleDialog Heading="Rename board" SubmitLabel="Save" Initial="@rename.Title" TestId="rename-dialog" Busy="@dialogBusy"
+                                  Error="@dialogError" OnSubmit="RenameBoardAsync" OnCancel="CloseDialogs" />
+            }
+
+            @if (deleteTarget is { } doomed)
+            {
+                <ConfirmDeleteDialog Name="@doomed.Title" Busy="@dialogBusy" Error="@dialogError"
+                                     OnConfirm="DeleteBoardAsync" OnCancel="CloseDialogs" />
+            }
+
+            @if (inviteOpen)
+            {
+                <InviteDialog OrganizationName="@ActiveOrganizationName()" Busy="@inviteBusy" Error="@inviteError" Notice="@inviteNotice"
+                              OnInvite="InviteAsync" OnCancel="CloseDialogs" />
+            }
+        }
+    </section>
+</div>
 
 @code {
+    /// <summary>How long the search box waits after the last keystroke before it asks the service (blazor-web-app §6).</summary>
+    private static readonly TimeSpan SearchDebounce = TimeSpan.FromMilliseconds(300);
+
+    [Parameter, SupplyParameterFromQuery]
+    public string? Search { get; set; }
+
+    [Parameter, SupplyParameterFromQuery]
+    public bool Favourites { get; set; }
+
+    [Parameter, SupplyParameterFromQuery]
+    public int? Page { get; set; }
+
     private WorkspaceState? state;
+    private string? sessionId;
+    private Guid? currentUser;
     private IReadOnlyList<AuthorityOrganization> organizations = [];
     private BoardPageDto? boards;
+    private string searchText = string.Empty;
     private string? error;
+    private string? notice;
     private bool loaded;
+
+    private bool createOpen;
+    private BoardSummaryDto? renameTarget;
+    private BoardSummaryDto? deleteTarget;
+    private bool dialogBusy;
+    private string? dialogError;
+
+    private bool inviteOpen;
+    private bool inviteBusy;
+    private string? inviteError;
+    private string? inviteNotice;
+
+    private Guid? busyBoard;
+
+    private CancellationTokenSource? loadCts;
+    private CancellationTokenSource? searchCts;
+
+    private string Heading => Favourites ? "Favourite boards" : "Team boards";
+
+    private bool IsActive => state?.Kind == WorkspaceKind.Active;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            var sessionId = await Session.IdAsync();
+            sessionId = await Session.IdAsync();
             var principal = await Session.PrincipalAsync();
             if (sessionId is null || principal is null)
             {
@@ -87,6 +211,7 @@
             }
 
             state = WorkspaceState.From(principal);
+            currentUser = WorkspaceClaims.UserId(principal);
 
             var listed = await Authority.ListOrganizationsAsync(sessionId);
             if (listed.Succeeded)
@@ -97,11 +222,6 @@
             {
                 error = listed.Error;
             }
-
-            if (state.Kind == WorkspaceKind.Active)
-            {
-                boards = await Boards.ListAsync(sessionId, search: null, favouritesOnly: false, page: 1, pageSize: 20);
-            }
         }
         catch (HttpRequestException)
         {
@@ -111,9 +231,289 @@
         loaded = true;
     }
 
-    private string WorkspaceName()
+    /// <summary>Runs on the first render and again whenever the address changes (search, view or page), so the list follows the link.</summary>
+    protected override async Task OnParametersSetAsync()
     {
-        var active = state?.WorkspaceId?.ToString("D");
-        return organizations.FirstOrDefault(org => string.Equals(org.Id, active, StringComparison.OrdinalIgnoreCase))?.Name ?? active ?? string.Empty;
+        searchText = Search ?? string.Empty;
+
+        if (loaded && IsActive && sessionId is not null)
+        {
+            await LoadBoardsAsync();
+        }
+    }
+
+    private async Task LoadBoardsAsync()
+    {
+        loadCts?.Cancel();
+        loadCts?.Dispose();
+        var cts = loadCts = new CancellationTokenSource();
+
+        var page = BoardQuery.Page(Page);
+        boards = null;
+        error = null;
+
+        try
+        {
+            var result = await Boards.ListAsync(sessionId!, BoardQuery.Search(Search), Favourites, page, BoardQuery.PageSize, cts.Token);
+
+            // A page past the end (after a delete emptied it) shows the last page, and the address follows.
+            var last = BoardQuery.PageCount(result.Total);
+            if (page > last)
+            {
+                Navigation.NavigateTo(BoardQuery.Url(Search, Favourites, last), replace: true);
+                return;
+            }
+
+            boards = result;
+        }
+        catch (HttpRequestException ex)
+        {
+            error = BoardErrors.For(ex, "Your boards could not be loaded. Try again in a moment.");
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+            // A newer address replaced this request; its result is the one that counts.
+        }
+    }
+
+    /// <summary>Debounced: the address changes once the user pauses typing, which also reloads the list through the parameters.</summary>
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        searchText = e.Value?.ToString() ?? string.Empty;
+
+        searchCts?.Cancel();
+        searchCts?.Dispose();
+        var cts = searchCts = new CancellationTokenSource();
+
+        try
+        {
+            await Task.Delay(SearchDebounce, cts.Token);
+            Navigation.NavigateTo(BoardQuery.Url(searchText, Favourites, 1), replace: true);
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+            // Another keystroke arrived first.
+        }
+    }
+
+    private void OpenCreate()
+    {
+        ClearMessages();
+        createOpen = true;
+    }
+
+    private void OpenRename(BoardSummaryDto board)
+    {
+        ClearMessages();
+        renameTarget = board;
+    }
+
+    private void OpenDelete(BoardSummaryDto board)
+    {
+        ClearMessages();
+        deleteTarget = board;
+    }
+
+    private void OpenInvite()
+    {
+        ClearMessages();
+        inviteOpen = true;
+    }
+
+    private void CloseDialogs()
+    {
+        createOpen = false;
+        renameTarget = null;
+        deleteTarget = null;
+        inviteOpen = false;
+        dialogError = null;
+        inviteError = null;
+        inviteNotice = null;
+    }
+
+    private void ClearMessages()
+    {
+        notice = null;
+        error = null;
+        dialogError = null;
+    }
+
+    // Changes below apply only after the service confirms them (no optimistic update).
+
+    private async Task CreateBoardAsync(string title)
+    {
+        dialogBusy = true;
+        dialogError = null;
+        try
+        {
+            var created = await Boards.CreateAsync(sessionId!, title);
+            createOpen = false;
+            notice = $"Board \"{created.Title}\" created.";
+            await LoadBoardsAsync();
+        }
+        catch (HttpRequestException ex)
+        {
+            dialogError = BoardErrors.For(ex, "Could not create the board. Try again in a moment.");
+        }
+        finally
+        {
+            dialogBusy = false;
+        }
+    }
+
+    private async Task RenameBoardAsync(string title)
+    {
+        if (renameTarget is not { } target)
+        {
+            return;
+        }
+
+        dialogBusy = true;
+        dialogError = null;
+        try
+        {
+            var updated = await Boards.RenameAsync(sessionId!, target.Id, title);
+            renameTarget = null;
+            notice = "Board renamed.";
+            ReplaceItem(updated);
+        }
+        catch (HttpRequestException ex)
+        {
+            dialogError = BoardErrors.For(ex, "Could not rename the board. Try again in a moment.");
+        }
+        finally
+        {
+            dialogBusy = false;
+        }
+    }
+
+    private async Task DeleteBoardAsync()
+    {
+        if (deleteTarget is not { } target)
+        {
+            return;
+        }
+
+        dialogBusy = true;
+        dialogError = null;
+        try
+        {
+            await Boards.DeleteAsync(sessionId!, target.Id);
+            deleteTarget = null;
+            notice = $"Board \"{target.Title}\" deleted.";
+            await LoadBoardsAsync();
+        }
+        catch (HttpRequestException ex)
+        {
+            dialogError = BoardErrors.For(ex, "Could not delete the board. Try again in a moment.");
+        }
+        finally
+        {
+            dialogBusy = false;
+        }
+    }
+
+    private async Task ToggleFavouriteAsync(BoardSummaryDto board)
+    {
+        ClearMessages();
+        busyBoard = board.Id;
+        try
+        {
+            await Boards.SetFavouriteAsync(sessionId!, board.Id, !board.IsFavourite);
+
+            // Removing a favourite on the favourites view takes the board out of the list, so the list is read again.
+            if (Favourites && board.IsFavourite)
+            {
+                await LoadBoardsAsync();
+            }
+            else
+            {
+                ReplaceItem(board with { IsFavourite = !board.IsFavourite });
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            error = BoardErrors.For(ex, "Could not update the favourite. Try again in a moment.");
+        }
+        finally
+        {
+            busyBoard = null;
+        }
+    }
+
+    private async Task InviteAsync(string email)
+    {
+        inviteError = null;
+        inviteNotice = null;
+
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            inviteError = "Enter an email address.";
+            return;
+        }
+
+        if (sessionId is null || state?.WorkspaceId is not { } workspace)
+        {
+            return;
+        }
+
+        inviteBusy = true;
+        try
+        {
+            var reply = await Authority.InviteMemberAsync(sessionId, workspace, email);
+            if (reply.Succeeded)
+            {
+                inviteNotice = $"Invitation sent to {email}.";
+            }
+            else
+            {
+                inviteError = reply.Error;
+            }
+        }
+        catch (HttpRequestException)
+        {
+            inviteError = "The invitation could not be sent. Try again in a moment.";
+        }
+        finally
+        {
+            inviteBusy = false;
+        }
+    }
+
+    private void ReplaceItem(BoardSummaryDto board)
+    {
+        if (boards is null)
+        {
+            return;
+        }
+
+        boards = boards with { Items = boards.Items.Select(item => item.Id == board.Id ? board : item).ToList() };
+    }
+
+    private AuthorityOrganization? ActiveOrganization() =>
+        state?.WorkspaceId is { } id
+            ? organizations.FirstOrDefault(org => string.Equals(org.Id, id.ToString("D"), StringComparison.OrdinalIgnoreCase))
+            : null;
+
+    private string? ActiveRole() => ActiveOrganization()?.Role;
+
+    private string ActiveOrganizationName() => ActiveOrganization()?.Name ?? "this workspace";
+
+    private string? WorkspaceName()
+    {
+        if (state is not { Kind: WorkspaceKind.Active, WorkspaceId: { } id })
+        {
+            return null;
+        }
+
+        return ActiveOrganization()?.Name ?? id.ToString("D");
+    }
+
+    public void Dispose()
+    {
+        loadCts?.Cancel();
+        loadCts?.Dispose();
+        searchCts?.Cancel();
+        searchCts?.Dispose();
     }
 }
