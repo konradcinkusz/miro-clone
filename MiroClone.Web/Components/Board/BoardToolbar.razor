@@ -1,0 +1,30 @@
+@using MiroClone.Web.Canvas.Interaction
+
+<nav class="board-toolbar" aria-label="Tools">
+    @foreach (var (tool, label) in Tools)
+    {
+        var active = tool == Active;
+        <button type="button" class="btn @(active ? "btn-primary" : "btn-quiet")"
+                aria-pressed="@(active ? "true" : "false")"
+                data-testid="tool-@tool.ToString().ToLowerInvariant()"
+                @onclick="() => OnSelect.InvokeAsync(tool)">@label</button>
+    }
+</nav>
+
+@code {
+    private static readonly (CanvasTool Tool, string Label)[] Tools =
+    [
+        (CanvasTool.Select, "Select"),
+        (CanvasTool.Rectangle, "Rectangle"),
+        (CanvasTool.Ellipse, "Ellipse"),
+        (CanvasTool.Text, "Text"),
+        (CanvasTool.Note, "Note"),
+        (CanvasTool.Pencil, "Pencil"),
+    ];
+
+    [Parameter, EditorRequired]
+    public CanvasTool Active { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback<CanvasTool> OnSelect { get; set; }
+}

@@ -72,4 +72,26 @@ public sealed class BoardsClient(HttpClient http)
 
         return response;
     }
+
+    /// <summary>
+    /// Finds one board of the session's workspace by walking the list, because the contract has no single-board read (ADR 0032).
+    /// Returns null when the workspace does not list it. Throws <see cref="HttpRequestException"/> when a page fails.
+    /// </summary>
+    public async Task<BoardSummaryDto?> FindAsync(string sessionId, Guid boardId, CancellationToken ct = default)
+    {
+        const int pageSize = 50;
+        for (var page = 1; ; page++)
+        {
+            var listed = await ListAsync(sessionId, search: null, favouritesOnly: false, page, pageSize, ct);
+            if (listed.Items.FirstOrDefault(board => board.Id == boardId) is { } found)
+            {
+                return found;
+            }
+
+            if (listed.Items.Count == 0 || page * pageSize >= listed.Total)
+            {
+                return null;
+            }
+        }
+    }
 }

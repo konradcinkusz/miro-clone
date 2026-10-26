@@ -1,0 +1,9 @@
+@using MiroClone.Web.Canvas.Core
+
+<polyline class="board-stroke" data-testid="layer-path" data-layer-id="@Layer.Id"
+          points="@SvgFormat.Points(Layer.Points ?? [])" stroke="@Layer.Fill.ToHex()" />
+
+@code {
+    [Parameter, EditorRequired]
+    public Layer Layer { get; set; } = null!;
+}
