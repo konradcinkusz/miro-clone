@@ -63,14 +63,16 @@ public sealed class HostPinTests
     }
 
     [Fact]
-    public void TheAccountPagesAreOutsideTheInteractiveRouterSoTheirFormsPostNatively()
+    public void TheAccountPagesAreInTheInteractiveRouterSoTheCircuitRoutesTheirUrl()
     {
+        // ExcludeFromInteractiveRouting removes a page from the router's table, and the interactive Routes renders every URL in the
+        // circuit: the sign-up form showed 'Page not found' once the circuit connected (ADR 0042). The forms still post natively.
         var pages = Directory.GetFiles(Path.Combine(Root, "MiroClone.Web", "Components", "Pages", "Account"), "*.razor");
 
         Assert.NotEmpty(pages);
         foreach (var page in pages)
         {
-            Assert.Contains("@attribute [ExcludeFromInteractiveRouting]", File.ReadAllText(page));
+            Assert.DoesNotContain("ExcludeFromInteractiveRouting", File.ReadAllText(page));
         }
     }
 
