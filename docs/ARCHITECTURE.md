@@ -171,8 +171,9 @@ sequenceDiagram
   end
 ```
 
-A purge that fails leaves an orphan snapshot. No code removes orphans yet: the log message says "left for the sweep" and
-ADR 0013 describes a sweep, but no sweep exists in the repository (see [`COMPLIANCE.md`](architecture/COMPLIANCE.md#3a-open-register)).
+A purge that fails leaves an orphan snapshot. Nothing removes orphans: no sweep exists, and the log message says so (ADR 0044). The
+snapshot is not read, because the access check answers 404 first. Removing orphans needs a decision on a listing or a service credential
+(see [`COMPLIANCE.md`](architecture/COMPLIANCE.md#3a-open-register), R9).
 
 ## 4. Persistence and data ownership
 

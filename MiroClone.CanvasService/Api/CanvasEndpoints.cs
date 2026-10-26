@@ -10,7 +10,8 @@ namespace MiroClone.CanvasService.Api;
 
 /// <summary>
 /// The REST surface: read a board's canvas, and purge it. A read needs a token, a single organization and a board the caller may
-/// see. A purge needs the caller's organization to own the snapshot, so it works after the board row is deleted (ADR 0016).
+/// see. A purge needs the caller's organization to own the snapshot, and the board to be deleted, so it works after the board row is
+/// gone (ADR 0016, ADR 0043).
 /// </summary>
 public static class CanvasEndpoints
 {
@@ -58,13 +59,16 @@ public static class CanvasEndpoints
     }
 
     /// <summary>
-    /// Purges the board's snapshot when the caller's organization owns it. A snapshot of another workspace answers 404, the same as
-    /// a missing board. A board with no stored snapshot answers 204, so a retry from BoardsService is harmless.
+    /// Purges a deleted board's snapshot. A board that BoardsService still shows the caller is live, so its canvas stays (409). A board
+    /// BoardsService does not show is deleted, because the caller's workspace is the same, and the snapshot is purged when the caller's
+    /// workspace owns it. A snapshot of another workspace answers 404, the same as a missing board. A board with no stored snapshot
+    /// answers 204, so a retry from BoardsService is harmless. BoardsService that cannot answer fails closed (ADR 0043).
     /// </summary>
     private static async Task<IResult> DeleteCanvasAsync(
         Guid boardId,
         HttpContext http,
         CanvasRegistry registry,
+        IBoardAccess boards,
         CancellationToken cancellationToken)
     {
         if (WorkspaceClaims.WorkspaceId(http.User) is not { } workspace)
@@ -72,8 +76,18 @@ public static class CanvasEndpoints
             return Results.NotFound();
         }
 
+        if (BearerToken.From(http.Request) is not { } token)
+        {
+            return Results.Unauthorized();
+        }
+
         try
         {
+            if (await boards.CheckAsync(boardId, token, cancellationToken) == BoardAccess.Allowed)
+            {
+                return Results.Problem(title: "The board still exists; only a deleted board's canvas is purged.", statusCode: StatusCodes.Status409Conflict);
+            }
+
             return await registry.PurgeAsync(boardId, workspace, cancellationToken) switch
             {
                 PurgeOutcome.NotOwned => Results.NotFound(),
@@ -83,6 +97,10 @@ public static class CanvasEndpoints
         catch (CanvasStoreUnavailableException)
         {
             return Results.Problem(title: "Canvas store unavailable.", statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+        catch (BoardsServiceException ex)
+        {
+            return Results.Problem(title: "Board access could not be checked.", statusCode: ex.StatusCode);
         }
     }
 

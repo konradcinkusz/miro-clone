@@ -106,7 +106,7 @@ export, if it has one, is outside this repository and is not verified here.
 | Data | Retention in code today | Gap |
 |---|---|---|
 | Boards | Until deleted | None |
-| Canvas snapshot after a delete | Until purged. A failed purge leaves an orphan **forever**, because no sweep exists (ADR 0013, ADR 0016) | The orphan keeps the layers of a deleted board. Needs the sweep |
+| Canvas snapshot after a delete | Until purged. A failed purge leaves an orphan **indefinitely**, because no sweep exists (ADR 0044, ADR 0013, ADR 0016) | The orphan keeps the layers of a deleted board. Needs an owner decision on reclaiming orphans |
 | Session | Eight hours absolute | None |
 | Presence | While connected | None |
 | Logs | Set by the exporter | Not configured in the repository; the query-string token question is open (UI-UX item 7) |
@@ -114,7 +114,7 @@ export, if it has one, is outside this repository and is not verified here.
 ## 6. Decisions open
 
 1. Erasure policy for `boards` and `board_favourites` (§4).
-2. A sweep or purge for orphan canvas snapshots, and the credential it uses (ADR 0013).
+2. Reclaiming orphan canvas snapshots, and the listing or service credential it would use (ADR 0013, ADR 0044).
 3. Whether a name claim should come from authservice, which would change what other people see (ADR 0016 §5).
 4. Telemetry redaction of the websocket token (ADR 0016 consequences).
 
