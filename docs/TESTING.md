@@ -28,16 +28,19 @@ The counts are test methods declared with `[Fact]` or `[Theory]`, not executed c
 
 | Project | Methods | What it proves | Needs |
 |---|---|---|---|
-| `MiroClone.ServiceDefaults.Tests` | 37 | The kernel: architecture rules (no `MiroClone.*` reference, no enum, no `DbContext`), JWT validation against a local JWKS, origin guard, forwarded headers, rate limits, health endpoints, workspace claim | None (PostgreSQL case gated) |
+| `MiroClone.ServiceDefaults.Tests` | 39 | The kernel: architecture rules (no `MiroClone.*` reference, no enum, no `DbContext`), JWT validation against a local JWKS, origin guard, forwarded headers, rate limits, health endpoints, workspace claim | None (PostgreSQL case gated) |
 | `MiroClone.BoardsService.Tests` | 38 | Board rules, list paging and search, the HTTP surface, favourites, the access check, the canvas purge client, the session endpoint | None; PostgreSQL migration and board tests gated |
-| `MiroClone.CanvasService.Tests` | 62 | Canvas aggregate rules and the 100-layer limit, JSON round trip, snapshot store and registry, the hub (identity stamped from the token, the layer limit, presence rate limit), the REST read and purge by ownership, the access client | None; snapshot PostgreSQL test gated |
+| `MiroClone.CanvasService.Tests` | 63 | Canvas aggregate rules and the 100-layer limit, JSON round trip, snapshot store and registry, the hub (identity stamped from the token, the layer limit, presence rate limit), the REST read and purge by ownership, the access client | None; snapshot PostgreSQL test gated |
 | `MiroClone.AppHost.Tests` | 9 | Estate wiring at model level: the authservice image and tag, wait edges, the environment each service receives | None. The containers are never started |
-| `MiroClone.Web.Tests` | 320 | Canvas Core rules and their isolation from Blazor types, the editor, the live session with a fake transport, two sessions converging on the real canvas hub on `TestServer`, pages in bUnit, account flows, session single-flight refresh, the stylesheet and cover contract, host pins, Data Protection keys | None; no browser |
+| `MiroClone.Web.Tests` | 332 | Canvas Core rules and their isolation from Blazor types, the editor, the live session with a fake transport, two sessions converging on the real canvas hub on `TestServer`, pages in bUnit, account flows, session single-flight refresh, the stylesheet and cover contract, host pins, Data Protection keys | None; no browser |
+| `MiroClone.Web.E2E` | 17 | The browser journeys: page-only ones run in CI; authenticated ones run only with `MIROCLONE_E2E_AUTHENTICATED=1` (ADR 0041) | Chromium; Docker and the pinned images for the estate. Skips with a reason locally (ADR 0040) |
 | `MiroClone.TestSupport` | 0 | A local authority stand-in and token factory, shared by the tests | None |
 
-Totals: about 466 methods. The PR #15 body reports a local run of 562 tests: 557 passed, 5 skipped, 0 failed (the skips are the
-PostgreSQL-gated tests). CI passed on the same commit, but its test log was not read for this page. The PR #13 body reports
-512 tests, 507 passed, 5 skipped before WP10.
+Totals: about 500 methods (measured at WP15). Local runs at WP15 (`dotnet test --solution MiroClone.sln`, Release, PostgreSQL 16 on the
+host):
+
+- Without `TEST_POSTGRES`: 0 failed, 22 skipped (the 5 PostgreSQL-gated tests, and 17 E2E tests that need the authservice image).
+- With `TEST_POSTGRES` set to the local server: 0 failed, 17 skipped (the same 17 E2E tests).
 
 ### What the architecture tests enforce
 

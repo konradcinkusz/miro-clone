@@ -1,6 +1,6 @@
 # Compliance with the reference architecture
 
-As of 2026-10-26, for `main` at WP10 (#15).
+As of 2026-10-26, for `main` after WP15 (PR #21, with the review in `docs/ARCHITECTURE_REVIEW.md` and `docs/SECURITY_REVIEW.md`).
 
 The checklist is §3 of `docs/architecture/00-REFERENCE-ARCHITECTURE.md` in `konradcinkusz/architecture-standards`, at commit
 `1f5ad43` (read in this session with a shallow clone). It has 19 items. Each row cites the evidence in this repository,
@@ -17,8 +17,10 @@ This page rests on four kinds of evidence, and no others:
 3. CI on PR #14 and PR #15, both green: `pr-validation` (including `docker-build` for the three images, which builds without pushing), and `secret-scan`.
 4. The PR bodies for #12–#15.
 
-No session that wrote this page had a Docker daemon, a .NET SDK or a browser, so **nothing below has been run live**. The
-AppHost, the authservice container, the Fly apps and every browser flow are unverified (register R1, R6, R12).
+WP15 had a .NET 10 SDK, a PostgreSQL 16 server, Chromium and a Docker daemon. It ran the unit, bUnit, TestServer and PostgreSQL
+suites, and a browser against a Release build of `MiroClone.Web` with real requests. It did **not** run the AppHost, the pinned
+authservice image or any authenticated browser flow: the registry refused the image and Docker Hub rate-limited the PostgreSQL
+image (register R1, R6). The Fly apps have never been deployed (R5, R11).
 
 ## 1. Checklist
 
@@ -40,9 +42,9 @@ AppHost, the authservice container, the Fly apps and every browser flow are unve
 | 14 | Outbound `HttpClient`s carry the standard resilience handler with explicit timeouts | Met, with a note | Kernel: `ServiceDefaultsExtensions.cs` lines 34–37 (`AddStandardResilienceHandler`, attempt 10 s, total 30 s). Purge client: `BoardsService/Canvas/CanvasPurgeClient.cs` line 68 (8 s), line 70 (`AllowAutoRedirect = false`). Access client: `CanvasService/ServiceCollectionExtensions.cs` line 52 | The Web's typed clients (`Web/ServiceCollectionExtensions.cs` lines 97, 105, 107) take the kernel's timeouts and set none of their own |
 | 15 | `Program.cs` is a manifest; wiring lives in `ServiceCollectionExtensions` | Met | `BoardsService/Program.cs` line 10 `AddBoardsService`; `CanvasService/Program.cs` line 10 `AddCanvasService`; `Web/Program.cs` line 10 `AddWebApp`. Wiring in `*/ServiceCollectionExtensions.cs` | `Program.cs` also orders the middleware, which the standard allows |
 | 16 | Extension points are interfaces registered in DI, not base classes | Met | `ICanvasSession` (`Web/Canvas/Editing/ICanvasSession.cs`), `IRealtimeCanvasSession` and `ICanvasHubConnection` (`Web/Canvas/Realtime/`), `ICanvasPointerSource` (`Web/Canvas/Interop/`), `IBoardAccess` (`CanvasService/Boards/IBoardAccess.cs`), `IOptionalIntegration` (`ServiceDefaults/OptionalIntegrations.cs`) | No base class is used as an extension point in the files read |
-| 17 | Has a test project; the logic-bearing layer is covered; characterisation tests are written before behaviour is migrated | Partial | Test projects for each service and for the Web app (`tests/`); about 466 test methods. The PR #15 body reports 557 passed and 5 skipped locally, and CI passed on that commit (`TESTING.md` §2) | No characterisation tests were written before the reference's behaviour was ported. Parity was checked by hand (PR #14 table). No E2E project yet (R6, R7) |
+| 17 | Has a test project; the logic-bearing layer is covered; characterisation tests are written before behaviour is migrated | Partial | Test projects for each service and for the Web app (`tests/`); about 500 test methods (WP15 count). WP15 local run: 0 failed with `TEST_POSTGRES` set (`TESTING.md` §2) | No characterisation tests were written before the reference's behaviour was ported. Parity was checked by hand (PR #14 table). A browser suite runs in CI for the page journeys; the authenticated journeys are opt-in (R6, R7) |
 | 18 | Built by the tag-driven workflow with path-based change detection | Not met | `.github/workflows/flyio.yml` has its change detection, but its only trigger is `workflow_dispatch` (`on:` at line 9). `pr-validation.yml` runs on every pull request, with no path filter | Owner decision, ADR 0026 (R5) |
-| 19 | Its architectural decisions are recorded in `docs/` | Met, with defects | `docs/decisions/` holds 0001–0037 and 0038 (this record). Defects: no 0029; two files numbered 0011; headings disagree with file names for 0015, 0022–0025, 0035–0037 | Recorded in R13. Renumbering is not done here, because it would move every link |
+| 19 | Its architectural decisions are recorded in `docs/` | Met | `docs/decisions/` holds 0001–0047. The defects of WP14 (two files numbered 0011, no 0029, headings that disagreed with file names) were fixed in WP15 (R13) | — |
 
 ## 2. Repo-baseline checks, §8 (documentation staleness)
 
@@ -52,36 +54,40 @@ These are not in the checklist, and they are part of every review (`repo-baselin
 |---|---|---|---|
 | `README.md` | Status "skeleton (WP02)"; test command | Stale | Rewritten in this change |
 | `docs/ARCHITECTURE.md` | — | New | Written from the code |
-| `AGENTS.md` | Layout table statuses (`WP00`, "partial"); `dotnet test MiroClone.sln` | Partly stale | Register R14, R15 |
+| `AGENTS.md` | Layout table statuses (`WP00`, "partial"); `dotnet test MiroClone.sln` | Fixed in WP15 | Register R12, R14 (closed) |
 | `docs/AUTH.md` | Claims, routes, development sign-in | Matches the code | — |
 | `docs/DEPLOYMENT.md` | Deployment disabled; owner steps | Matches ADR 0026 | — |
-| `docs/decisions/0022-…` | Setting name `DataProtection:KeyDirectory` | Stale: the code uses `DataProtection:KeysPath` (`Web/ServiceCollectionExtensions.cs` line 73) | Register R13 |
-| `docs/decisions/0013-…` | A sweep of orphan snapshots exists | Stale: no sweep is in the repository | Register R9 |
+| `docs/decisions/0022-…` | Setting name `DataProtection:KeyDirectory` | Fixed in WP15: the setting is `DataProtection:KeysPath` (`Web/ServiceCollectionExtensions.cs`) | Register R13 (closed) |
+| `docs/decisions/0013-…` | A sweep of orphan snapshots exists | Corrected by ADR 0044: no sweep is built, and the logs say so | Register R9 (decision open) |
 
 Environment variables: one authoritative place per variable is the `flyio/*.fly.toml` for Fly and `EstateExtensions.cs` for
 local development. Both are named in `DEPLOYMENT.md` and `AUTH.md`.
 
 ## 3a. Open register
 
-Every row is dated. A row goes away when it is fixed, and stays with its reasoning when it is accepted.
+Every row is dated. A row goes away when it is fixed, and stays with its reasoning when it is accepted. Rows closed in WP15 stay here,
+marked closed, with the evidence that closed them.
 
 | # | Repo | Deviation | Principle | Since | Plan or owner |
 |---|---|---|---|---|---|
-| R1 | miro-clone | The AppHost and the authservice container have never been started. The sessions that wrote these pages, including this one, had no Docker daemon | P1; ADR 0011 (verification boundary) | 2026-10-25 (WP02) | Owner or a session with Docker runs `scripts/run-local-stack.sh` once and records the result |
-| R2 | miro-clone | OTLP export is unverified. The hub's `access_token` query value is not confirmed redacted in telemetry | P15, P5; ADR 0016 consequences | 2026-10-26 (WP10) | Verify in a run; add redaction if the instrumentation records the query |
+| R1 | miro-clone | **Open.** The AppHost and the authservice container have never been started. WP15 had a Docker daemon, but Docker Hub returned 429 for `postgres:18.3`, the ghcr blob for the authservice image was refused (403), and building authservice from its source was refused by the session's policy | P1; ADR 0011 (verification boundary) | 2026-10-25 (WP02) | A session or the owner with registry access runs `scripts/run-local-stack.sh` once and records it |
+| R2 | miro-clone | **Partly closed (ADR 0047).** The hub's `access_token` is removed from span URL tags before export, and a test proves it. Still open: log messages and exception text are not scrubbed, and the OTLP export has not run live | P15, P5; ADR 0016, ADR 0047 | 2026-10-26 (WP10) | Verify the export in a run; decide the socket ticket (R18) |
 | R3 | miro-clone | Canvas snapshot table is hand-written DDL, not EF migrations | P4; `state-snapshot-persistence` §6 | 2026-10-25 (WP05) | Accepted: ADR 0015 |
 | R4 | miro-clone | User-facing strings in the kernel are not machine-checked | P2; ADR 0005 | 2026-10-25 (WP01) | Accepted: review enforces it (ADR 0005) |
 | R5 | miro-clone | Tag-driven deploy and preview workflows are disabled, so there is no path-filtered build or deploy | P12, P7; `fly-io-deployment` | 2026-10-25 (WP13) | Owner decision, ADR 0026. Re-enabling needs a new ADR |
-| R6 | miro-clone | No browser end-to-end suite is in the repository; no board has been driven in a browser | P13 | 2026-10-26 (WP08–WP11) | WP12 in progress |
+| R6 | miro-clone | **Partly closed.** A browser suite runs in CI (`e2e` job): the page journeys, including the account forms after the circuit connects (ADR 0042). **Open:** the 12 authenticated journeys (sign-up to dashboard, boards, live two-browser sessions) skip unless `MIROCLONE_E2E_AUTHENTICATED=1`, because the authservice image could not be run in WP15 | P13; ADR 0041 | 2026-10-26 (WP08–WP12) | Run them in CI with the pinned authservice; then remove the opt-in gate |
 | R7 | miro-clone | Behaviour ported from the reference was not characterised by tests before the port. Parity was checked by hand (PR #14) | P13 (characterisation before migration) | 2026-10-26 (WP08–WP11) | Accepted for now. Characterise before any further port |
-| R8 | miro-clone | The web sign-in endpoints have no rate limit. The kernel's auth policy is defined and used by no service | `service-api-patterns` §1 | 2026-10-25 (WP06) | Apply `RateLimitPolicies.Auth` to `/account/*`. Needs a decision on the limit |
-| R9 | miro-clone | Orphan canvas snapshots are never swept. The logs say "left for the sweep" | ADR 0013; `state-snapshot-persistence` §5 | 2026-10-25 (WP04, WP05) | Build the sweep, with a decision on the credential it uses |
+| R8 | miro-clone | **Closed (WP15, ADR 0045).** The account forms require the kernel's auth policy (10 per client per minute) and redirect with a message when rejected; sign-out is exempt. Evidence: `AccountRateLimitingTests`; live, the 11th and 12th sign-ins redirected. Boards and Canvas APIs keep the global per-user limit (S-10, below) | `service-api-patterns` §1 | 2026-10-25 (WP06) | Closed |
+| R9 | miro-clone | **Corrected, decision open (WP15, ADR 0044).** No sweep of orphan canvas snapshots exists, and the logs and docs now say so. Orphans are kept indefinitely; they are not read, because the access check answers 404 first | ADR 0013; `state-snapshot-persistence` §5; PRIVACY.md §5 | 2026-10-25 (WP04, WP05) | Owner decision on reclaim (listing or service credential), PRIVACY.md §6 |
 | R10 | miro-clone | Erasure in authservice is not handled. Board author ids and favourite rows are kept | `identity-and-accounts` §8 | 2026-10-26 | Owner decision, PRIVACY.md §4 |
 | R11 | miro-clone | Fly deploy has never run. Web and Canvas reach `boards-service` and `canvas-service` by discovery names, and `flyio/web.fly.toml` sets no boards address | `fly-io-deployment`; ADR 0017 | 2026-10-25 (WP13) | Verify at the owner's first deploy, and set the addresses |
-| R12 | miro-clone | `dotnet test MiroClone.sln` is written in `AGENTS.md`, `PROTOCOL.md` and `pr-validation.yml`. The WP10 run's local SDK rejected it. CI passed on the same form | `repo-baseline` §8 | 2026-10-26 (WP10) | Confirm the CI SDK. Then fix `AGENTS.md` |
-| R13 | miro-clone | ADR numbering: two files numbered 0011; no 0029; headings disagree with file names for 0015, 0022–0025 and 0035–0037; ADR 0022 names a setting the code does not use | P14; `repo-baseline` §8 | 2026-10-25 (WP02–WP10) | Renumber and correct the headings in one PR with their references |
-| R14 | miro-clone | `AGENTS.md` layout table still shows WP00 and "partial" statuses | `repo-baseline` §8 | 2026-10-26 | Update in the next PR that touches `AGENTS.md` |
-| R15 | miro-clone | Sessions and circuits live in one web instance's memory | `blazor-web-app` §14; ADR 0022, ADR 0019 | 2026-10-25 (WP06) | Shared session store, decided before any scale-out |
+| R12 | miro-clone | **Closed (WP15).** `dotnet test MiroClone.sln` is rejected by the pinned SDK (10.0.113: "should be via `--solution`"). `AGENTS.md`, `PROTOCOL.md`, the PR template and `TESTING.md` now use `--solution`. Correction: `pr-validation.yml` never ran the solution form; it runs each project with `--project`. The disabled `flyio.yml` still writes the solution form (outside this change, per the Fly constraint) | `repo-baseline` §8 | 2026-10-26 (WP10) | Closed. Owner may update `flyio.yml` |
+| R13 | miro-clone | **Closed (WP15).** ADR numbering: the canvas-core record is `0029` (it was a second `0011`); ten headings now match their file names; the README index lists every ADR; ADR 0022 names the setting the code reads (`DataProtection:KeysPath`) | P14; `repo-baseline` §8 | 2026-10-25 (WP02–WP10) | Closed |
+| R14 | miro-clone | **Closed (WP15).** `AGENTS.md` layout table now shows the work package that built each path, with no "partial" statuses | `repo-baseline` §8 | 2026-10-26 | Closed |
+| R15 | miro-clone | Sessions, circuits and the offline outbox live in one web instance's memory | `blazor-web-app` §14; ADR 0022, ADR 0019 | 2026-10-25 (WP06) | Shared session store, decided before any scale-out |
 | R16 | miro-clone | Consent is checked at sign-in only, and two-factor sign-in is refused | `identity-and-accounts` §9; ADR 0025 | 2026-10-25 (WP06) | Follow-up under ADR 0025 |
+| R17 | miro-clone | **New (WP15).** Sign-up in authservice answers a duplicate email with Identity's "already taken" text, which the web app shows. A script can list the emails that have accounts (SECURITY_REVIEW S-8). The forgot-password answer is generic | `identity-and-accounts` (enumeration) | 2026-10-26 | Owner or authservice change: one answer for new and taken addresses |
+| R18 | miro-clone | **New (WP15).** The hub's access token travels in the WebSocket URL (ADR 0016). It can appear in edge request logs | ADR 0016; SECURITY_REVIEW S-7 | 2026-10-26 | Owner decision: a short-lived ticket or a header-capable transport (needs an ADR) |
+| R19 | miro-clone | **New (WP15).** The Web app has no request limit except the account forms (ADR 0045). The Boards and Canvas APIs have only the global per-user limit, with no endpoint policy (SECURITY_REVIEW S-9, S-10) | `service-api-patterns` §1; security-review §9 (blocker 3) | 2026-10-26 | Owner decision: an edge limit at deploy, and the `Api` policy's numbers on the list and create endpoints |
 
-R3, R4, R5 and R16 are accepted deliberately, with their ADRs. Each of the others is drift until its plan is carried out.
+R3, R4, R5, R7 and R16 are accepted deliberately, with their ADRs or rows. R8, R12, R13 and R14 are closed with evidence. R9, R10, R17, R18 and R19 are owner decisions; each stays open until the owner decides. Each of the others is drift until its plan is carried out.
