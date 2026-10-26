@@ -30,7 +30,7 @@ public sealed class BoardsClient(HttpClient http)
     }
 
     /// <summary>
-    /// Finds one board of the session's workspace by walking the list, because the contract has no single-board read (ADR 0028).
+    /// Finds one board of the session's workspace by walking the list, because the contract has no single-board read (ADR 0029).
     /// Returns null when the workspace does not list it. Throws <see cref="HttpRequestException"/> when a page fails.
     /// </summary>
     public async Task<BoardSummaryDto?> FindAsync(string sessionId, Guid boardId, CancellationToken ct = default)

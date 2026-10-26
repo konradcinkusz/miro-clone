@@ -16,7 +16,7 @@ internal sealed class AuthHarness : IDisposable
 
     public ScriptedHandler Boards { get; } = new();
 
-    public ManualClock Clock { get; } = new(new DateTimeOffset(2026, 10, 25, 12, 0, 0, TimeSpan.Zero));
+    public ManualClock Clock { get; } = new(DateTimeOffset.UtcNow);
 
     private readonly ServiceProvider _provider;
 

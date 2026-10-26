@@ -3,7 +3,7 @@ using Xunit;
 namespace MiroClone.Web.Tests.Canvas.Interop;
 
 /// <summary>
-/// The pointer module is the only JavaScript in the app (ADR 0026). These checks keep it inside its budget: at most 60 lines, no
+/// The pointer module is the only JavaScript in the app (ADR 0027). These checks keep it inside its budget: at most 60 lines, no
 /// imports, no network, no eval. They read the file, so a change that breaks the budget fails here before review.
 /// </summary>
 public sealed class CanvasPointerModuleTests
@@ -15,7 +15,7 @@ public sealed class CanvasPointerModuleTests
     {
         var lines = Module.Split('\n').Length;
 
-        Assert.True(lines <= 60, $"canvas-pointer.js has {lines} lines; the budget is 60 (ADR 0026).");
+        Assert.True(lines <= 60, $"canvas-pointer.js has {lines} lines; the budget is 60 (ADR 0027).");
     }
 
     [Fact]
