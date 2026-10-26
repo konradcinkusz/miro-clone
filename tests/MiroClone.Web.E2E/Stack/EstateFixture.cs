@@ -170,6 +170,9 @@ public sealed class EstateFixture : IAsyncLifetime
         var webPort = FreePort();
         var authPort = FreePort();
         var project = Path.Combine(RepositoryRoot(), "MiroClone.AppHost", "MiroClone.AppHost.csproj");
+        // Pulled here, not by the AppHost, so a registry refusal shows its own message in the log instead of a stalled start.
+        await PullAuthServiceImageAsync();
+
         // No --configuration: the Aspire CLI that dotnet run hands the AppHost to starts its bin/Debug build, and dotnet run
         // builds that when it is missing. A Release-only build of the AppHost makes the start fail.
         var start = new ProcessStartInfo("dotnet") { UseShellExecute = false };
@@ -291,6 +294,25 @@ public sealed class EstateFixture : IAsyncLifetime
         catch (System.ComponentModel.Win32Exception)
         {
             return false;
+        }
+    }
+
+    private static async Task PullAuthServiceImageAsync()
+    {
+        var pull = new ProcessStartInfo("docker") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
+        pull.ArgumentList.Add("pull");
+        pull.ArgumentList.Add(AuthServiceImage);
+        using var process = Process.Start(pull) ?? throw new InvalidOperationException("docker could not be started to pull authservice.");
+        var output = process.StandardOutput.ReadToEndAsync();
+        var errors = process.StandardError.ReadToEndAsync();
+        using var patience = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+        await process.WaitForExitAsync(patience.Token);
+        var text = await output + await errors;
+        Console.WriteLine($"--- docker pull {AuthServiceImage} (exit {process.ExitCode}) ---");
+        Console.WriteLine(text);
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"docker pull {AuthServiceImage} failed with exit {process.ExitCode}: {text}");
         }
     }
 
