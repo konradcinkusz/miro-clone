@@ -45,10 +45,10 @@ internal sealed partial class CanvasPurgeClient(HttpClient http, ILogger<CanvasP
         }
     }
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Canvas purge for board {BoardId} returned {StatusCode}; the orphan snapshot is left for the sweep.")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Canvas purge for board {BoardId} returned {StatusCode}; the orphan snapshot is not swept (ADR 0044).")]
     private static partial void LogPurgeRefused(ILogger logger, Guid boardId, int statusCode);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Canvas purge for board {BoardId} did not complete; the orphan snapshot is left for the sweep.")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Canvas purge for board {BoardId} did not complete; the orphan snapshot is not swept (ADR 0044).")]
     private static partial void LogPurgeUnreachable(ILogger logger, Guid boardId, Exception exception);
 }
 

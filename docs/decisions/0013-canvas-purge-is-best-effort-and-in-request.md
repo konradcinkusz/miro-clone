@@ -1,6 +1,6 @@
 # 0013 — A deleted board's canvas is purged in the request, best effort, with the caller's token; the orphan is harmless
 
-- **Status:** Accepted
+- **Status:** Accepted. The sweep this record describes is not built; ADR 0044 corrects that claim and the logs say so.
 - **Date:** 2026-10-25
 - **Principles:** P3 (one database per service; cross-context reads go over HTTP); P11 (anti-corruption at the edge);
   service-api-patterns §5 (forward the inbound bearer, no auto-redirect on service clients, timeouts by criticality, retry only
