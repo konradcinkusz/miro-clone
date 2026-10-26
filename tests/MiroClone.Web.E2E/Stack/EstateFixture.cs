@@ -191,22 +191,64 @@ public sealed class EstateFixture : IAsyncLifetime
     {
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
         var deadline = DateTimeOffset.UtcNow + StartupLimit;
+        var last = "no answer";
         while (DateTimeOffset.UtcNow < deadline)
         {
             if (_apphost is { HasExited: true })
             {
+                await DumpDiagnosticsAsync();
                 throw new InvalidOperationException($"The AppHost exited with code {_apphost.ExitCode} before {url} was healthy.");
             }
 
-            if (await ReachableAsync(url, http))
+            try
             {
-                return;
+                using var reply = await http.GetAsync(url);
+                if (reply.IsSuccessStatusCode)
+                {
+                    return;
+                }
+
+                last = $"{(int)reply.StatusCode} {await reply.Content.ReadAsStringAsync()}";
+            }
+            catch (HttpRequestException error)
+            {
+                last = error.Message;
+            }
+            catch (TaskCanceledException)
+            {
+                last = "timed out";
             }
 
             await Task.Delay(TimeSpan.FromSeconds(2));
         }
 
-        throw new TimeoutException($"{url} did not answer 200 within {StartupLimit}.");
+        await DumpDiagnosticsAsync();
+        throw new TimeoutException($"{url} did not answer 200 within {StartupLimit}. Last answer: {last}");
+    }
+
+    /// <summary>
+    /// Prints what a failed start leaves behind, so the CI log says why: the containers and their recent logs, and the tail of the
+    /// newest Aspire CLI log. Nothing here changes the outcome.
+    /// </summary>
+    private static async Task DumpDiagnosticsAsync()
+    {
+        Console.WriteLine("--- estate diagnostics ---");
+        Console.WriteLine(await RunAsync("docker", "ps", "-a", "--format", "{{.Names}} | {{.Image}} | {{.Status}}"));
+        foreach (var name in (await RunAsync("docker", "ps", "-a", "--format", "{{.Names}}")).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            Console.WriteLine($"--- logs of {name} (last 60 lines) ---");
+            var lines = (await RunAsync("docker", "logs", "--tail", "60", name)).Split('\n');
+            Console.WriteLine(string.Join('\n', lines));
+        }
+
+        var logs = new DirectoryInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".aspire", "logs"));
+        var newest = logs.Exists ? logs.GetFiles("*.log").OrderByDescending(file => file.LastWriteTimeUtc).FirstOrDefault() : null;
+        if (newest is not null)
+        {
+            Console.WriteLine($"--- {newest.FullName} (last 80 lines) ---");
+            var lines = await File.ReadAllLinesAsync(newest.FullName);
+            Console.WriteLine(string.Join('\n', lines.TakeLast(80)));
+        }
     }
 
     private static async Task<bool> ReachableAsync(string url, HttpClient? client = null)
