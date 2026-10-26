@@ -1,0 +1,25 @@
+.selection-bar {
+    align-items: center;
+}
+
+.swatches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    max-width: 164px;
+}
+
+.swatch {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--swatch);
+    cursor: pointer;
+}
+
+.swatch:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+}

@@ -6,7 +6,7 @@
       fill="@Layer.Fill.ToHex()" />
 <text class="board-text" data-testid="note-text" data-layer-id="@Layer.Id"
       x="@SvgFormat.Num(Layer.X + Padding)" y="@SvgFormat.Num(Layer.Y + Padding)"
-      dominant-baseline="hanging">@Layer.Value</text>
+      dominant-baseline="hanging" fill="@Palette.ReadableOn(Layer.Fill).ToHex()">@Layer.Value</text>
 
 @code {
     /// <summary>Inset from the note's top-left corner, in world units.</summary>

@@ -1,13 +1,20 @@
-@* A modal dialog shell: a labelled dialog that closes on Escape. Focus is placed by the first control's autofocus. *@
+@* A modal dialog shell: a labelled dialog that closes on Escape. Focus starts on the first control (its autofocus) and stays inside the
+   dialog while it is open: two sentinels at its edges send Tab and Shift+Tab back in (ADR 0034). No JavaScript: the framework focuses. *@
 <div class="dialog-backdrop">
-    <div class="card dialog" role="dialog" aria-modal="true" aria-labelledby="@_titleId" data-testid="@TestId" @onkeydown="OnKeyDown">
+    <span class="dialog-sentinel" tabindex="0" aria-hidden="true" @ref="_before" @onfocus="FocusEnd"></span>
+    <div class="card dialog" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="@_titleId" data-testid="@TestId"
+         @ref="_card" @onkeydown="OnKeyDown">
         <h2 id="@_titleId">@Title</h2>
         @ChildContent
     </div>
+    <span class="dialog-sentinel" tabindex="0" aria-hidden="true" @ref="_after" @onfocus="FocusCard"></span>
 </div>
 
 @code {
     private readonly string _titleId = $"dialog-{Guid.NewGuid():N}";
+    private ElementReference _before;
+    private ElementReference _card;
+    private ElementReference _after;
 
     [Parameter, EditorRequired]
     public string Title { get; set; } = string.Empty;
@@ -22,4 +29,10 @@
     public EventCallback OnClose { get; set; }
 
     private Task OnKeyDown(KeyboardEventArgs e) => e.Key == "Escape" ? OnClose.InvokeAsync() : Task.CompletedTask;
+
+    /// <summary>Shift+Tab out of the first control lands here. The end sentinel comes next, so the following Shift+Tab reaches the last control.</summary>
+    private async Task FocusEnd(FocusEventArgs _) => await _after.FocusAsync();
+
+    /// <summary>Tab out of the last control lands here. The dialog itself takes the focus, so the next Tab reaches the first control.</summary>
+    private async Task FocusCard(FocusEventArgs _) => await _card.FocusAsync();
 }

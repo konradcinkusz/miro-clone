@@ -1,6 +1,6 @@
 # 0027 — The dashboard keeps its list state in the address, applies changes only after the service confirms them, and departs from the Next.js reference in three named places
 
-- **Status:** Accepted
+- **Status:** Accepted (deviation 1 and the focus statement amended by ADR 0034)
 - **Date:** 2026-10-26
 - **Principles:** blazor-web-app §3 (`[SupplyParameterFromQuery]` for shareable state), §5 (errors as state, one `role="alert"`),
   §6 (debounce with a cancelled task, cancelled on dispose), §9 (scoped CSS for component layout, no invented shared class names),

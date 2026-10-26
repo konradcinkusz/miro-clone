@@ -1,0 +1,37 @@
+@using MiroClone.Web.Canvas.Core
+
+@if (Visible)
+{
+    <div class="selection-bar cluster" role="toolbar" aria-label="Selection" data-testid="selection-bar">
+        <div class="swatches" role="group" aria-label="Colour">
+            @foreach (var swatch in Palette.Colours)
+            {
+                @* The swatch colour is layer data: it reaches the button as a custom property, never a stylesheet. *@
+                <button type="button" class="swatch" title="@swatch.Name" aria-label="@swatch.Name"
+                        style="--swatch: @swatch.Colour.ToHex()" data-testid="colour-@swatch.Name.ToLowerInvariant()"
+                        @onclick="() => OnColour.InvokeAsync(swatch.Colour)"></button>
+            }
+        </div>
+        <button type="button" class="btn btn-quiet" data-testid="bring-to-front" @onclick="() => OnFront.InvokeAsync()">Bring to front</button>
+        <button type="button" class="btn btn-quiet" data-testid="send-to-back" @onclick="() => OnBack.InvokeAsync()">Send to back</button>
+        <button type="button" class="btn btn-quiet" data-testid="delete-selection" @onclick="() => OnDelete.InvokeAsync()">Delete</button>
+    </div>
+}
+
+@code {
+    /// <summary>Shown only while something is selected.</summary>
+    [Parameter]
+    public bool Visible { get; set; }
+
+    [Parameter]
+    public EventCallback<Rgb> OnColour { get; set; }
+
+    [Parameter]
+    public EventCallback OnFront { get; set; }
+
+    [Parameter]
+    public EventCallback OnBack { get; set; }
+
+    [Parameter]
+    public EventCallback OnDelete { get; set; }
+}
