@@ -18,10 +18,10 @@ public sealed class AccountJourneyTests(EstateFixture stack) : JourneyTests(stac
         await using var journey = await Journey.OpenAsync(Stack);
 
         await journey.GoToStaticAsync("/sign-up");
-        await journey.Page.GetByLabel("Email").FillAsync(account.Email);
-        await journey.Page.GetByLabel("Password").FillAsync(account.Password);
-        await journey.Page.GetByLabel("I accept the Terms of Use").CheckAsync();
-        await journey.Page.GetByLabel("I accept the Privacy Policy").CheckAsync();
+        await journey.FillFieldAsync("#sign-up-email", account.Email);
+        await journey.FillFieldAsync("#sign-up-password", account.Password);
+        await journey.Page.Locator("#sign-up-terms").CheckAsync();
+        await journey.Page.Locator("#sign-up-privacy").CheckAsync();
         await journey.Page.GetByTestId("sign-up-submit").ClickAsync();
 
         // The dev outbox sends no verification step (ADR 0011), so the new account is signed in at once and has no organization yet.

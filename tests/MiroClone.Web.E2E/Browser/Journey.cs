@@ -53,13 +53,32 @@ public sealed partial class Journey : IAsyncDisposable
     public async Task SignInAsync(Account account)
     {
         await GoToStaticAsync("/sign-in");
-        await Page.GetByLabel("Email").FillAsync(account.Email);
-        await Page.GetByLabel("Password").FillAsync(account.Password);
+        await FillFieldAsync("#sign-in-email", account.Email);
+        await FillFieldAsync("#sign-in-password", account.Password);
         var ready = _circuit.ReadyCount;
         await Page.GetByTestId("sign-in-submit").ClickAsync();
         await Expect(Page).ToHaveURLAsync(new Regex("/$"));
         await _circuit.WaitForReadyAsync(ready + 1);
         await Expect(Page.GetByTestId("signed-in-email")).ToHaveTextAsync(account.Email);
+    }
+
+    /// <summary>
+    /// Fills a form field by its element id, the id the account pages publish. On a timeout the page's address and markup go to the
+    /// log before the failure is rethrown, so a missing field shows what the page actually rendered.
+    /// </summary>
+    public async Task FillFieldAsync(string selector, string value)
+    {
+        try
+        {
+            await Page.Locator(selector).FillAsync(value, new LocatorFillOptions { Timeout = 15_000 });
+        }
+        catch (TimeoutException)
+        {
+            var html = await Page.ContentAsync();
+            Console.WriteLine($"--- {selector} not found at {Page.Url} (title: {await Page.TitleAsync()}) ---");
+            Console.WriteLine(html.Length > 6000 ? html[..6000] : html);
+            throw;
+        }
     }
 
     /// <summary>Opens the dashboard for a signed-in user and waits until its heading shows.</summary>
