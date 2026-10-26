@@ -52,5 +52,6 @@ public interface IRealtimeCanvasSession : ICanvasSession
 /// <summary>Opens a live session for one board. The page calls it once it has the board's layers.</summary>
 public interface ICanvasSessionFactory
 {
-    IRealtimeCanvasSession Open(string sessionId, Guid selfUserId, string selfName, Guid boardId, CanvasDocument initial);
+    /// <param name="dispatcher">Where the session runs its changes: the page's own dispatcher, so changes reach the page as its events do.</param>
+    IRealtimeCanvasSession Open(string sessionId, Guid selfUserId, string selfName, Guid boardId, CanvasDocument initial, SynchronizationContext? dispatcher);
 }

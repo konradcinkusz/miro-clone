@@ -245,7 +245,13 @@ internal static class Eventually
 /// <summary>Opens the live session over a fake hub, with a long retry delay so a test sees the reconnecting state and nothing after it.</summary>
 internal sealed class TestSessionFactory(ICanvasHubConnector connector) : ICanvasSessionFactory
 {
-    public IRealtimeCanvasSession Open(string sessionId, Guid selfUserId, string selfName, Guid boardId, CanvasDocument initial) =>
+    public IRealtimeCanvasSession Open(
+        string sessionId,
+        Guid selfUserId,
+        string selfName,
+        Guid boardId,
+        CanvasDocument initial,
+        SynchronizationContext? dispatcher) =>
         new HubCanvasSession(
             boardId,
             selfUserId,
@@ -254,7 +260,7 @@ internal sealed class TestSessionFactory(ICanvasHubConnector connector) : ICanva
             connector,
             _ => Task.FromResult<string?>("token"),
             TimeProvider.System,
-            dispatcher: null,
+            dispatcher,
             logger: null,
             retryDelay: TimeSpan.FromMinutes(1));
 }

@@ -15,7 +15,7 @@ WP10 connects the board to the canvas hub. Three things need deciding that the f
 ## Decision
 
 - **`HubCanvasSession : IRealtimeCanvasSession`** holds one board's document, one `History` and one outbox. It implements `ICanvasSession`, so the editor's rules are unchanged: `Commit` runs `History.Execute` as before, then queues the applied mutations for the hub. The editor gains one method, `Reconcile`, which drops a selection a remote delete removed.
-- **Remote edits go through `MutationApplier` on the dispatcher.** The session captures the circuit's context when the page opens it (`HubCanvasSessionFactory`) and posts every change to it. Tests pass no dispatcher and run changes inline. A `Changed` event tells the page to re-read the frame, inside `InvokeAsync`.
+- **Remote edits go through `MutationApplier` on the dispatcher.** The page passes a `ComponentDispatcher`, which runs each posted change through its own `InvokeAsync`, so a change reaches the page as the page's own events do. Tests pass no dispatcher and run changes inline. A `Changed` event tells the page to re-read the frame.
 - **The outbox is ordered and sent one at a time.** An edit leaves the queue only when the hub has taken it. A transport failure leaves it queued for the next connection, where a repeat of an edit the service already has changes nothing (`MutationApplier` is idempotent).
 - **A reconnect re-reads the board.** The hub's `InitialState` replaces the document. The edits still in the outbox are then replayed on top, so the user's view keeps them and they are sent after the join.
 - **A refused edit is dropped and the board is re-read.** This covers the layer limit and an invalid layer. The service's state wins. A rate-limited edit is kept and sent after 250 ms.

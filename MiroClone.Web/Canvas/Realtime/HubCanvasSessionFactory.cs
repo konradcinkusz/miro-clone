@@ -6,8 +6,7 @@ namespace MiroClone.Web.Canvas.Realtime;
 
 /// <summary>
 /// Opens the production session: a SignalR connection from the circuit to the canvas service. The access token comes from the
-/// session service on the server, so it never reaches the browser (ADR 0022). The session's dispatcher is the circuit's own
-/// synchronization context, captured here because this runs on the circuit.
+/// session service on the server, so it never reaches the browser (ADR 0022). Changes run on the dispatcher the page passes.
 /// </summary>
 public sealed class HubCanvasSessionFactory(
     SessionService sessions,
@@ -21,7 +20,13 @@ public sealed class HubCanvasSessionFactory(
     /// <summary>The handler chain with service discovery applied (ServiceDefaults adds it to every client).</summary>
     public const string HandlerName = "canvas-hub";
 
-    public IRealtimeCanvasSession Open(string sessionId, Guid selfUserId, string selfName, Guid boardId, CanvasDocument initial)
+    public IRealtimeCanvasSession Open(
+        string sessionId,
+        Guid selfUserId,
+        string selfName,
+        Guid boardId,
+        CanvasDocument initial,
+        SynchronizationContext? dispatcher)
     {
         ArgumentException.ThrowIfNullOrEmpty(sessionId);
 
@@ -34,7 +39,7 @@ public sealed class HubCanvasSessionFactory(
             connector,
             cancellation => sessions.GetAccessTokenAsync(sessionId, cancellation),
             clock,
-            dispatcher: SynchronizationContext.Current,
+            dispatcher: dispatcher,
             logger: logger);
     }
 }

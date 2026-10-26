@@ -124,7 +124,13 @@ else if (session is { } live && editor is not null && frame is not null)
 
             title = board.Title;
             // The live session starts from the REST state and is replaced by the hub's state as soon as the room answers (WP10).
-            session = Realtime.Open(sessionId, selfId, principal.Identity?.Name ?? string.Empty, BoardId, CanvasStateMapper.ToDocument(state));
+            session = Realtime.Open(
+                sessionId,
+                selfId,
+                principal.Identity?.Name ?? string.Empty,
+                BoardId,
+                CanvasStateMapper.ToDocument(state),
+                new ComponentDispatcher(work => InvokeAsync(work)));
             session.Changed += OnRealtimeChanged;
             session.Start();
             editor = new BoardEditor(session);
