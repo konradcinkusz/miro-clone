@@ -483,6 +483,22 @@ public sealed class BoardEditorTests
         Assert.Null(editor.Frame().SelectionBounds);
     }
 
+    [Fact]
+    public void ADragThatEndsAfterARemoteDeleteDoesNotRecreateTheLayer()
+    {
+        var layer = Rectangle(0, 0, 50, 50);
+        var session = new RecordingSession([layer]);
+        var editor = new BoardEditor(session);
+        editor.Apply(Down(10, 10));
+        editor.Apply(Move(40, 40));
+
+        session.Commit([LayerMutation.Delete(layer.Id)]);
+        editor.Apply(Up(40, 40));
+
+        Assert.False(session.Document.TryGet(layer.Id, out _));
+        Assert.DoesNotContain(session.Commits.SelectMany(commit => commit), mutation => mutation.Kind == LayerMutationKind.Upsert && mutation.Id == layer.Id);
+    }
+
     private static KeyInput Plain(string key) => new(key, Ctrl: false, Shift: false);
 
     private static Layer Rectangle(double x, double y, double width, double height) =>

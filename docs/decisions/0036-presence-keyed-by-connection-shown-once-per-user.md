@@ -1,4 +1,4 @@
-# 0034 — Presence is kept per connection, shown once per user, paced at 50 ms, and a leave the session cannot place re-reads the room
+# 0036 — Presence is kept per connection, shown once per user, paced at 50 ms, and a leave the session cannot place re-reads the room
 
 - **Status:** Accepted
 - **Date:** 2026-10-26

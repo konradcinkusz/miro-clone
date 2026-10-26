@@ -1,4 +1,4 @@
-# 0033 — The live board session is a hub client owned by the circuit: an ordered outbox, remote edits on the dispatcher, and a re-read on every reconnect
+# 0035 — The live board session is a hub client owned by the circuit: an ordered outbox, remote edits on the dispatcher, and a re-read on every reconnect
 
 - **Status:** Accepted
 - **Date:** 2026-10-26
@@ -27,4 +27,4 @@ WP10 connects the board to the canvas hub. Three things need deciding that the f
 - The circuit holds one hub connection per open board. The token is read from the session service for each request. No token reaches the browser (ADR 0022).
 - Every mutation is applied on the same thread as the editor, so no lock is needed around the document reads that the editor makes each frame. The locks that remain protect only the outbox and the participant map, which the background loops touch.
 - **Known limit.** A drag that began before a remote delete of its layer re-creates the layer on release, because an upsert creates a missing layer. The editor is WP09's and is not changed here; WP11 can filter the commit if it matters.
-- The outbox is unbounded. A board edited for hours offline holds every edit until the connection returns. Acceptable for this audience; a cap with a notice is the first change if it is not.
+- The outbox is unbounded. A board edited for hours offline holds every edit until the connection returns. Acceptable for this audience; a cap with a notice is the first change if it is not. **Amended by ADR 0046:** the outbox now holds at most 1,000 edits, and at the cap new edits are refused with a notice.

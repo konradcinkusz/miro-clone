@@ -152,7 +152,6 @@ number 0011, and some headings disagree with their file names; the file name is 
 | [0009](docs/decisions/0009-migrate-on-startup-in-the-kernel.md) | Migration on startup, before the host listens |
 | [0010](docs/decisions/0010-generated-migrations-excluded-from-style-rules.md) | EF Core migration files are generated code |
 | [0011](docs/decisions/0011-authservice-adoption-and-token-contract.md) | authservice as a pinned image; one audience; `organization` claim |
-| [0011](docs/decisions/0011-canvas-core-in-the-web-assembly.md) | Canvas rules in `Canvas/Core` (duplicate number) |
 | [0012](docs/decisions/0012-canvas-core-rules-and-layer-order.md) | Layer order, net selection, resize, history |
 | [0013](docs/decisions/0013-canvas-purge-is-best-effort-and-in-request.md) | Canvas purge after delete is best effort |
 | [0014](docs/decisions/0014-boards-list-validation-and-test-database-interpretations.md) | Boards list, validation and test database |
@@ -170,6 +169,7 @@ number 0011, and some headings disagree with their file names; the file name is 
 | [0026](docs/decisions/0026-fly-deployment-disabled-by-owner.md) | Fly.io deployment disabled by owner decision |
 | [0027](docs/decisions/0027-dashboard-state-in-the-address-and-deviations-from-the-reference.md) | Dashboard state in the address; deviations from the reference |
 | [0028](docs/decisions/0028-board-covers-are-token-coloured-svg-and-the-dashboard-has-no-javascript.md) | Board covers are token-coloured SVG; no dashboard JavaScript |
+| [0029](docs/decisions/0029-canvas-core-in-the-web-assembly.md) | Canvas rules in `Canvas/Core`, under a source-level isolation test |
 | [0030](docs/decisions/0030-one-es-module-for-board-pointer-input.md) | One ES module (60 lines) for pointer input |
 | [0031](docs/decisions/0031-board-edits-are-local-until-the-hub-lands-and-gestures-commit-once.md) | Edits through `ICanvasSession`; one gesture, one undo step |
 | [0032](docs/decisions/0032-board-title-by-walking-the-list-until-a-single-read-is-frozen.md) | Board title by walking the list |
@@ -179,8 +179,15 @@ number 0011, and some headings disagree with their file names; the file name is 
 | [0036](docs/decisions/0036-presence-keyed-by-connection-shown-once-per-user.md) | Presence keyed by connection, shown once per user |
 | [0037](docs/decisions/0037-circuit-hub-client-uses-http-transports-through-service-discovery.md) | The circuit's hub client uses SSE and long polling |
 | [0038](docs/decisions/0038-compliance-register-and-verification-boundary.md) | Compliance evidence and the open register |
-
-There is no ADR 0029 in the repository.
+| [0039](docs/decisions/0039-e2e-suite-is-playwright-dotnet-and-starts-its-own-estate.md) | End-to-end suite: Playwright for .NET, starts its own estate |
+| [0040](docs/decisions/0040-e2e-journeys-skip-with-a-reason-locally-and-fail-in-ci.md) | E2E journeys skip with a reason locally, fail in CI |
+| [0041](docs/decisions/0041-e2e-estate-in-ci-is-started-from-containers-and-built-services-not-the-apphost.md) | E2E estate in CI: containers and built services, not the AppHost |
+| [0042](docs/decisions/0042-account-pages-stay-in-the-interactive-router.md) | Account pages stay in the interactive router (amends 0022) |
+| [0043](docs/decisions/0043-canvas-purge-requires-the-board-to-be-deleted.md) | A canvas purge needs the board to be deleted (amends 0016) |
+| [0044](docs/decisions/0044-orphan-canvas-snapshots-are-not-swept.md) | Orphan canvas snapshots are not swept |
+| [0045](docs/decisions/0045-the-auth-rate-limit-covers-the-account-forms-and-not-sign-out.md) | Auth rate limit on the account forms; sign-out exempt |
+| [0046](docs/decisions/0046-the-live-outbox-is-capped-and-refuses-new-edits-with-a-notice.md) | The live outbox holds at most 1,000 edits; new ones are refused with a notice (amends 0035) |
+| [0047](docs/decisions/0047-security-headers-form-body-limit-and-token-redaction-in-telemetry.md) | Security headers, an account form body limit, no token in exported spans |
 
 ## Licence
 

@@ -27,7 +27,7 @@ decide with the standards, record the decision, move on.
 ## 2. Prove (never skip, report what you ran)
 ```bash
 dotnet build MiroClone.sln            # 0 warnings
-dotnet test MiroClone.sln             # all green; with TEST_POSTGRES if a local PostgreSQL is available
+dotnet test --solution MiroClone.sln     # all green; with TEST_POSTGRES if a local PostgreSQL is available
 scripts/check-*.sh                    # repo guards, once they exist
 ```
 Re-read your own diff adversarially (tenant isolation, tokens in browser, secrets, kernel purity) before pushing.

@@ -74,7 +74,8 @@ public static class ServiceDefaultsExtensions
             .WithTracing(tracing => tracing
                 .AddSource(builder.Environment.ApplicationName)
                 .AddAspNetCoreInstrumentation(options => options.Filter = context => !IsProbe(context.Request.Path))
-                .AddHttpClientInstrumentation());
+                .AddHttpClientInstrumentation()
+                .AddProcessor(new QueryTokenRedactor()));
 
         if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
         {

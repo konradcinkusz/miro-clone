@@ -1,4 +1,4 @@
-# 0011 — The canvas rules live in MiroClone.Web/Canvas/Core, plain C#, under a source-level isolation test
+# 0029 — The canvas rules live in MiroClone.Web/Canvas/Core, plain C#, under a source-level isolation test
 
 - **Status:** Accepted
 - **Date:** 2026-10-25

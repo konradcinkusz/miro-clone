@@ -2,6 +2,7 @@ using MiroClone.Web.Auth;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.WebUtilities;
 using MiroClone.ServiceDefaults;
@@ -13,15 +14,43 @@ namespace MiroClone.Web.Account;
 /// cookie, the antiforgery check and the redirect. Every step answers with a redirect back to a page, carrying a message in the
 /// query; no step answers with a bare error. Authentication is never decided here by the cookie alone: the session is in the store.
 /// </summary>
+/// <summary>Limits the request body of every endpoint in a group, before a handler reads it (ADR 0047).</summary>
+public static class FormBodyLimit
+{
+    public static RouteGroupBuilder LimitFormBody(this RouteGroupBuilder group, long bytes) =>
+        group.AddEndpointFilter(async (context, next) =>
+        {
+            // A declared length over the limit is refused before any read. Minimal APIs do not enforce IRequestSizeLimitMetadata, and
+            // a body without a length (chunked) is capped by the server's feature, set here before the handler reads it.
+            if (context.HttpContext.Request.ContentLength is { } declared && declared > bytes)
+            {
+                return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
+            }
+
+            if (context.HttpContext.Features.Get<IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } feature)
+            {
+                feature.MaxRequestBodySize = bytes;
+            }
+
+            return await next(context);
+        });
+}
+
 public static class AccountEndpoints
 {
     public const string FormExpired = "Your form expired. Submit it again.";
+
+    /// <summary>The largest account form body. The forms carry an email, a password and two checkboxes; anything larger is refused
+    /// before it is read, so an unauthenticated client cannot make the server buffer megabytes (ADR 0047).</summary>
+    public const int MaximumFormBytes = 16 * 1024;
 
     public static IEndpointRouteBuilder MapAccountEndpoints(this IEndpointRouteBuilder endpoints)
     {
         // The auth policy covers every form that checks a password or sends a message. Sign-out is left out: ending a session must
         // always work (ADR 0045).
-        var account = endpoints.MapGroup("/account").RequireRateLimiting(RateLimitPolicies.Auth);
+        var account = endpoints.MapGroup("/account")
+            .RequireRateLimiting(RateLimitPolicies.Auth)
+            .LimitFormBody(MaximumFormBytes);
         account.MapPost("/sign-in", SignIn);
         account.MapPost("/sign-up", SignUp);
         account.MapPost("/verify-email", VerifyEmail);

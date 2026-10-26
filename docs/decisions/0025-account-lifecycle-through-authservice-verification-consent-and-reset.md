@@ -1,4 +1,4 @@
-# 0020 — The account lifecycle runs through authservice: verification, the current consent versions, reset, and consent at sign-in
+# 0025 — The account lifecycle runs through authservice: verification, the current consent versions, reset, and consent at sign-in
 
 - **Status:** Accepted
 - **Date:** 2026-10-25

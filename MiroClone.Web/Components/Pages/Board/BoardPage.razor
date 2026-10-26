@@ -35,7 +35,7 @@ else if (notFound)
 }
 else if (session is { } live && editor is not null && frame is not null)
 {
-    <ConnectionBanner State="live.Connection" />
+    <ConnectionBanner State="live.Connection" EditsPaused="live.EditsPaused" />
     <BoardHeader Title="@(title ?? string.Empty)" Participants="live.Participants" />
 
     @* The keyboard is read here, on the page, so it works wherever focus is on the board: the canvas, the toolbar or the selection bar. *@

@@ -547,8 +547,10 @@ public sealed class BoardEditor
 
     private void CommitPreview()
     {
+        // A layer a remote delete removed during the drag is not moved back: an upsert would re-create it for the whole room (ADR 0035).
         var changed = _preview.Values
             .Where(moved => !moved.HasSameContent(_originals[moved.Id]))
+            .Where(moved => _session.Document.TryGet(moved.Id, out _))
             .Select(LayerMutation.Upsert)
             .ToArray();
 

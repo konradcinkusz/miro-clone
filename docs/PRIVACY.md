@@ -116,6 +116,6 @@ export, if it has one, is outside this repository and is not verified here.
 1. Erasure policy for `boards` and `board_favourites` (§4).
 2. Reclaiming orphan canvas snapshots, and the listing or service credential it would use (ADR 0013, ADR 0044).
 3. Whether a name claim should come from authservice, which would change what other people see (ADR 0016 §5).
-4. Telemetry redaction of the websocket token (ADR 0016 consequences).
+4. The websocket token in logs and at the edge (ADR 0016; ADR 0047 redacts span tags; the socket ticket is R18 in COMPLIANCE).
 
 These are also in [architecture/COMPLIANCE.md](architecture/COMPLIANCE.md#3a-open-register).

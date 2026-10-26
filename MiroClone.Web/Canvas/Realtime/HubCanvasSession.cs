@@ -26,6 +26,14 @@ public sealed partial class HubCanvasSession : IRealtimeCanvasSession, ICanvasHu
     /// <summary>How long the outbox waits before it tries a rate-limited edit again.</summary>
     public static readonly TimeSpan RateLimitPause = TimeSpan.FromMilliseconds(250);
 
+    /// <summary>
+    /// The most edits the outbox holds while the connection is down (ADR 0035). At the cap, new local edits are refused and the
+    /// page says so, so a long offline session cannot grow without bound.
+    /// </summary>
+    public const int DefaultMaximumOutbox = 1000;
+
+    private static readonly IReadOnlyList<LayerMutation> NoChange = [];
+
     private static readonly TimeSpan MaximumRetryDelay = TimeSpan.FromSeconds(15);
 
     private readonly Guid _boardId;
@@ -43,6 +51,7 @@ public sealed partial class HubCanvasSession : IRealtimeCanvasSession, ICanvasHu
     private readonly Lock _gate = new();
     private readonly History _history = new();
     private readonly Queue<LayerMutation> _outbox = new();
+    private readonly int _maximumOutbox;
     private readonly Dictionary<string, PresenceEntry> _participants = [];
     private long _received;
 
@@ -60,6 +69,7 @@ public sealed partial class HubCanvasSession : IRealtimeCanvasSession, ICanvasHu
     /// <param name="accessToken">The signed-in session's access token, or null when the session has ended.</param>
     /// <param name="dispatcher">Where document changes run; the circuit's context on the page, null in tests.</param>
     /// <param name="retryDelay">The first wait before a reconnect. It doubles up to 15 seconds and resets after a live connection.</param>
+    /// <param name="maximumOutbox">The most edits held unsent before new edits are refused (ADR 0035).</param>
     public HubCanvasSession(
         Guid boardId,
         Guid selfUserId,
@@ -70,8 +80,10 @@ public sealed partial class HubCanvasSession : IRealtimeCanvasSession, ICanvasHu
         TimeProvider clock,
         SynchronizationContext? dispatcher = null,
         ILogger? logger = null,
-        TimeSpan? retryDelay = null)
+        TimeSpan? retryDelay = null,
+        int maximumOutbox = DefaultMaximumOutbox)
     {
+        _maximumOutbox = maximumOutbox > 0 ? maximumOutbox : throw new ArgumentOutOfRangeException(nameof(maximumOutbox));
         _boardId = boardId;
         _selfUserId = selfUserId;
         _selfName = selfName ?? throw new ArgumentNullException(nameof(selfName));
@@ -166,7 +178,19 @@ public sealed partial class HubCanvasSession : IRealtimeCanvasSession, ICanvasHu
     {
         lock (_gate)
         {
-            return Send(_history.Execute(_document, mutations));
+            return _outbox.Count >= _maximumOutbox ? NoChange : Send(_history.Execute(_document, mutations));
+        }
+    }
+
+    /// <summary>True while the outbox is full. New local edits are refused until the connection takes some of the queue.</summary>
+    public bool EditsPaused
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _outbox.Count >= _maximumOutbox;
+            }
         }
     }
 
@@ -175,7 +199,7 @@ public sealed partial class HubCanvasSession : IRealtimeCanvasSession, ICanvasHu
     {
         lock (_gate)
         {
-            return Send(_history.Undo(_document));
+            return _outbox.Count >= _maximumOutbox ? NoChange : Send(_history.Undo(_document));
         }
     }
 
@@ -183,7 +207,7 @@ public sealed partial class HubCanvasSession : IRealtimeCanvasSession, ICanvasHu
     {
         lock (_gate)
         {
-            return Send(_history.Redo(_document));
+            return _outbox.Count >= _maximumOutbox ? NoChange : Send(_history.Redo(_document));
         }
     }
 
@@ -441,6 +465,22 @@ public sealed partial class HubCanvasSession : IRealtimeCanvasSession, ICanvasHu
     }
 
     /// <summary>Sends queued edits in order, one at a time. A transport failure leaves the queue as it is for the next connection.</summary>
+    /// <summary>Takes the head of the outbox after the service has it, and tells the page when that lifts a pause.</summary>
+    private void DequeueSent()
+    {
+        bool resumed;
+        lock (_gate)
+        {
+            resumed = _outbox.Count >= _maximumOutbox;
+            _outbox.Dequeue();
+        }
+
+        if (resumed)
+        {
+            Notify();
+        }
+    }
+
     private async Task DrainOutboxAsync(CancellationToken ct)
     {
         while (true)
@@ -487,10 +527,7 @@ public sealed partial class HubCanvasSession : IRealtimeCanvasSession, ICanvasHu
             try
             {
                 await connection.SendMutationAsync(_boardId, HubWire.ToWire(next), ct);
-                lock (_gate)
-                {
-                    _outbox.Dequeue();
-                }
+                DequeueSent();
             }
             catch (HubException exception) when (exception.Message.Contains(HubMethods.RateLimited, StringComparison.Ordinal))
             {
@@ -501,9 +538,9 @@ public sealed partial class HubCanvasSession : IRealtimeCanvasSession, ICanvasHu
                 // The service refused the edit (the layer limit, or a shape it does not accept). It is dropped here, and the
                 // board is re-read so the local copy matches the service.
                 LogRefusedEdit(_logger, _boardId, exception.Message);
+                DequeueSent();
                 lock (_gate)
                 {
-                    _outbox.Dequeue();
                     RequestResync();
                 }
             }

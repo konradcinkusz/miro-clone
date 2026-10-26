@@ -1,4 +1,4 @@
-# 0035 — The circuit's hub client uses server-sent events and long polling, reached through the service-discovery handler
+# 0037 — The circuit's hub client uses server-sent events and long polling, reached through the service-discovery handler
 
 - **Status:** Accepted
 - **Date:** 2026-10-26
