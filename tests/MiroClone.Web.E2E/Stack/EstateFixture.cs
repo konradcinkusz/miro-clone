@@ -88,7 +88,17 @@ public sealed class EstateFixture : IAsyncLifetime
                 return;
             }
 
-            await PullAuthServiceImageAsync();
+            try
+            {
+                await PullAuthServiceImageAsync();
+            }
+            catch (InvalidOperationException error)
+            {
+                // A registry refusal is an unavailable estate: a skip with the reason locally, a failure under MIROCLONE_E2E_REQUIRED.
+                Unavailable($"{AuthServiceImage} cannot be pulled ({FirstLine(error.Message)}).");
+                return;
+            }
+
             if (Environment.GetEnvironmentVariable(AppHostVariable) == "1")
             {
                 await StartEstateAsync();

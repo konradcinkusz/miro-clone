@@ -1,6 +1,6 @@
 # 0017 — Sign-in is a backend-for-frontend: native account forms, tokens in a server-side session, a cookie that names it
 
-- **Status:** Accepted
+- **Status:** Accepted. The account-page clause (outside the interactive router) is amended by ADR 0042.
 - **Date:** 2026-10-25
 - **Principles:** blazor-web-app §7 (sessions and authentication: tokens stay server-side, the host validates the identity provider's tokens when the cookie is issued, no `HttpContext` in components, circuit revalidation), §8 (origin guard), §14 (state in server memory, shared Data Protection keys); identity-and-accounts §1 (claims stamped at issuance), §10 (key material); P5 (tokens never reach the browser); ADR 0001 (Blazor over Next.js: the circuit is the BFF)
 
@@ -12,8 +12,8 @@ authservice is a credential API, not an OpenID Connect provider: it takes an ema
 
 ## Decision
 
-- **Account forms are plain forms.** The sign-in, sign-up, verification, password and consent pages are static server pages, outside the
-  interactive router (`[ExcludeFromInteractiveRouting]`). Each form posts to a minimal endpoint under `/account/` (`AccountEndpoints`),
+- **Account forms are plain forms.** The sign-in, sign-up, verification, password and consent pages post their forms natively; they are routed by
+  the interactive router (ADR 0042 amends the earlier `[ExcludeFromInteractiveRouting]` decision). Each form posts to a minimal endpoint under `/account/` (`AccountEndpoints`),
   which checks the antiforgery token, calls the account step (`AccountFlows`), writes the cookie and redirects. A circuit is not needed to sign in.
 - **Tokens live in a server-side session.** `SessionService` keeps the access and refresh tokens in `IDistributedCache`, keyed by a random
   session id. The cookie (`miroclone.session`: HttpOnly, SameSite=Strict, Secure outside Development) holds the subject, the email, the
