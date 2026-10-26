@@ -213,6 +213,9 @@ public sealed class BoardEditor
         _selection.Clear();
     }
 
+    /// <summary>Drops selected layers that a remote change removed, so the selection never names a layer that is not on the board (WP10).</summary>
+    public void Reconcile() => PruneSelection();
+
     /// <summary>Selects every layer on the board.</summary>
     public void SelectAll()
     {

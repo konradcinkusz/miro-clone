@@ -466,6 +466,23 @@ public sealed class BoardEditorTests
         Assert.Equal(2, editor.Frame().Selection.Count);
     }
 
+    [Fact]
+    public void ReconcileDropsASelectedLayerThatARemoteDeleteRemoved()
+    {
+        var layer = Rectangle(0, 0, 50, 50);
+        var session = new RecordingSession([layer]);
+        var editor = new BoardEditor(session);
+        editor.Apply(Down(10, 10));
+        editor.Apply(Up(10, 10));
+        Assert.Equal([layer.Id], editor.Frame().Selection);
+
+        session.Commit([LayerMutation.Delete(layer.Id)]);
+        editor.Reconcile();
+
+        Assert.Empty(editor.Frame().Selection);
+        Assert.Null(editor.Frame().SelectionBounds);
+    }
+
     private static KeyInput Plain(string key) => new(key, Ctrl: false, Shift: false);
 
     private static Layer Rectangle(double x, double y, double width, double height) =>

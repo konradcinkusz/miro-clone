@@ -8,6 +8,7 @@ using MiroClone.ServiceDefaults;
 using MiroClone.Web.Api;
 using MiroClone.Web.Auth;
 using MiroClone.Web.Canvas.Interop;
+using MiroClone.Web.Canvas.Realtime;
 
 namespace MiroClone.Web;
 
@@ -108,5 +109,8 @@ public static class ServiceCollectionExtensions
 
         // The board surface's pointer input (ADR 0030). One per circuit; the surface disposes it with the page.
         services.AddTransient<ICanvasPointerSource, JsCanvasPointerSource>();
+
+        // The live board session: a SignalR connection from the circuit to the canvas hub (WP10, ADR 0035). One per opened board.
+        services.AddTransient<ICanvasSessionFactory, HubCanvasSessionFactory>();
     }
 }

@@ -2,17 +2,20 @@
 @attribute [Authorize]
 @using System.Net
 @using Microsoft.AspNetCore.Authorization
+@using MiroClone.ServiceDefaults
 @using MiroClone.Web.Api
 @using MiroClone.Web.Auth
 @using Microsoft.AspNetCore.Components.Web
 @using MiroClone.Web.Canvas.Core
 @using MiroClone.Web.Canvas.Editing
 @using MiroClone.Web.Canvas.Interaction
+@using MiroClone.Web.Canvas.Realtime
 @using MiroClone.Web.Components.Board
 @using MiroClone.Web.Components.Shared
 @inject ICurrentSession Session
 @inject CanvasClient Canvas
 @inject BoardsClient Boards
+@inject ICanvasSessionFactory Realtime
 @inject NavigationManager Navigation
 @implements IAsyncDisposable
 
@@ -30,9 +33,10 @@ else if (notFound)
         <p><a href="/">Back to boards</a></p>
     </section>
 }
-else if (editor is not null && frame is not null)
+else if (session is { } live && editor is not null && frame is not null)
 {
-    <BoardHeader Title="@(title ?? string.Empty)" Name="@youName" />
+    <ConnectionBanner State="live.Connection" />
+    <BoardHeader Title="@(title ?? string.Empty)" Participants="live.Participants" />
 
     @* The keyboard is read here, on the page, so it works wherever focus is on the board: the canvas, the toolbar or the selection bar. *@
     <div class="board-shell" @onkeydown="HandleKey">
@@ -43,7 +47,7 @@ else if (editor is not null && frame is not null)
                           OnBack="SendToBack" OnDelete="DeleteSelection" />
         </div>
 
-        <CanvasSurface Frame="frame" OnInput="HandleInput" OnEditText="EditText" OnFinishEdit="FinishEdit" />
+        <CanvasSurface Frame="frame" Remote="live.RemoteParticipants" OnInput="HandleInput" OnEditText="EditText" OnFinishEdit="FinishEdit" />
     </div>
 
     @if (frame.Notice is { } notice)
@@ -58,11 +62,11 @@ else if (editor is not null && frame is not null)
     private const string LoadFailed = "This board could not be loaded. Try again in a moment.";
 
     private readonly CancellationTokenSource lifetime = new();
-    private ICanvasSession? session;
+    private IRealtimeCanvasSession? session;
     private BoardEditor? editor;
     private CanvasFrame? frame;
     private string? title;
-    private string youName = string.Empty;
+    private Point? cursor;
     private string? error;
     private bool loading = true;
     private bool notFound;
@@ -111,7 +115,12 @@ else if (editor is not null && frame is not null)
                 return;
             }
 
-            youName = principal.Identity?.Name ?? string.Empty;
+            if (WorkspaceClaims.UserId(principal) is not { } selfId)
+            {
+                error = LoadFailed;
+                return;
+            }
+
             var state = await Canvas.GetAsync(sessionId, BoardId, ct);
             var board = await Boards.FindAsync(sessionId, BoardId, ct);
             if (board is null)
@@ -121,7 +130,16 @@ else if (editor is not null && frame is not null)
             }
 
             title = board.Title;
-            session = new LocalCanvasSession(CanvasStateMapper.ToDocument(state));
+            // The live session starts from the REST state and is replaced by the hub's state as soon as the room answers (WP10).
+            session = Realtime.Open(
+                sessionId,
+                selfId,
+                principal.Identity?.Name ?? string.Empty,
+                BoardId,
+                CanvasStateMapper.ToDocument(state),
+                new ComponentDispatcher(work => InvokeAsync(work)));
+            session.Changed += OnRealtimeChanged;
+            session.Start();
             editor = new BoardEditor(session);
             frame = editor.Frame();
         }
@@ -144,7 +162,16 @@ else if (editor is not null && frame is not null)
         }
     }
 
-    private void HandleInput(CanvasInput input) => Act(board => board.Apply(input));
+    private void HandleInput(CanvasInput input)
+    {
+        // The cursor is read off the camera before the input applies, so it is where the pointer is (ADR 0036).
+        if (input is PointerInput pointer && editor is not null)
+        {
+            cursor = editor.Camera.ScreenToWorld(pointer.Screen);
+        }
+
+        Act(board => board.Apply(input));
+    }
 
     /// <summary>Ctrl or Meta is read as one flag, so Ctrl+Z and Cmd+Z do the same.</summary>
     private void HandleKey(KeyboardEventArgs args) =>
@@ -178,7 +205,24 @@ else if (editor is not null && frame is not null)
 
         change(editor);
         frame = editor.Frame();
+        Announce();
     }
+
+    /// <summary>A remote change, a participant or the connection changed. Runs on the page's dispatcher, so the page reacts directly.</summary>
+    private void OnRealtimeChanged() => _ = InvokeAsync(() =>
+    {
+        // A remote delete may have removed a selected layer; the selection is brought back in line before the frame is drawn.
+        editor?.Reconcile();
+        if (editor is not null)
+        {
+            frame = editor.Frame();
+        }
+
+        StateHasChanged();
+    });
+
+    /// <summary>Tells the room where this user's pointer is and what is selected (ADR 0036). The session paces the sends.</summary>
+    private void Announce() => session?.SetPresence(cursor, frame?.Selection ?? []);
 
     private async Task CloseSessionAsync()
     {
@@ -189,6 +233,7 @@ else if (editor is not null && frame is not null)
 
         if (closing is not null)
         {
+            closing.Changed -= OnRealtimeChanged;
             await closing.DisposeAsync();
         }
     }

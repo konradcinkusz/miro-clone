@@ -1,18 +1,16 @@
+@using MiroClone.Web.Canvas.Realtime
+
 <header class="board-header">
     <a class="btn btn-quiet" href="/" data-testid="back-to-boards">Boards</a>
     <h1 class="board-title" data-testid="board-title">@Title</h1>
-    <ul class="board-participants" aria-label="Participants">
-        <li class="avatar" title="You" data-testid="participant-self">@Initial</li>
-    </ul>
+    <ParticipantAvatars Participants="Participants" />
 </header>
 
 @code {
     [Parameter, EditorRequired]
     public string Title { get; set; } = string.Empty;
 
-    /// <summary>The signed-in user's name; only its first letter is shown. Other participants arrive with WP10.</summary>
+    /// <summary>Everyone on the board, the signed-in user first. Comes from the live session (WP10).</summary>
     [Parameter]
-    public string Name { get; set; } = string.Empty;
-
-    private string Initial => Name.Length > 0 ? char.ToUpperInvariant(Name[0]).ToString() : "?";
+    public IReadOnlyList<ParticipantView> Participants { get; set; } = [];
 }

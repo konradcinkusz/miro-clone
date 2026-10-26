@@ -8,6 +8,8 @@ using MiroClone.Web.Canvas.Core;
 using MiroClone.Web.Canvas.Interaction;
 using MiroClone.Web.Canvas.Interop;
 using MiroClone.Web.Components.Pages.Board;
+using MiroClone.Web.Canvas.Realtime;
+using MiroClone.Web.Tests.Canvas.Realtime;
 using MiroClone.Web.Tests.TestSupport;
 using Xunit;
 
@@ -25,11 +27,13 @@ public sealed class BoardPageTests : BunitContext
     private readonly ScriptedHandler _canvas = new();
     private readonly ScriptedHandler _boards = new();
     private readonly FakeCanvasPointer _pointer = new();
+    private readonly FakeHubConnector _hub = new();
 
     public BoardPageTests()
     {
         Services.AddSingleton<ICurrentSession>(new FakeSession(Principal()));
         Services.AddSingleton<ICanvasPointerSource>(_pointer);
+        Services.AddSingleton<ICanvasSessionFactory>(new TestSessionFactory(_hub));
         Services.AddSingleton(new CanvasClient(new HttpClient(_canvas) { BaseAddress = new Uri("http://canvas-service/") }));
         Services.AddSingleton(new BoardsClient(new HttpClient(_boards) { BaseAddress = new Uri("http://boards-service/") }));
     }
@@ -140,6 +144,47 @@ public sealed class BoardPageTests : BunitContext
         await DisposeAsync();
 
         Assert.True(_pointer.Disposed);
+    }
+
+    [Fact]
+    public void ALostConnectionSaysSoAndKeepsTheBoardOnScreen()
+    {
+        ArrangeBoard("Roadmap", [(Rectangle, "Rectangle")]);
+        var page = Render<BoardPage>(parameters => parameters.Add(component => component.BoardId, Board));
+        page.WaitForAssertion(() => Assert.NotNull(page.Find("[data-testid='canvas-surface']")));
+        page.WaitForAssertion(() => Assert.Single(_hub.Connections));
+
+        _hub.Latest.Drop(new IOException("the network went away"));
+
+        page.WaitForAssertion(() => Assert.Equal("reconnecting", page.Find("[data-testid='connection-banner']").GetAttribute("data-state")));
+        Assert.Single(page.FindAll("[data-testid='layer-rectangle']"));
+    }
+
+    [Fact]
+    public void ARemoteDeleteRemovesTheLayerFromTheBoard()
+    {
+        ArrangeBoard("Roadmap", [(Rectangle, "Rectangle")]);
+        var page = Render<BoardPage>(parameters => parameters.Add(component => component.BoardId, Board));
+        page.WaitForAssertion(() => Assert.Single(page.FindAll("[data-testid='layer-rectangle']")));
+        page.WaitForAssertion(() => Assert.Single(_hub.Connections));
+
+        _hub.Latest.Listener.OnLayerMutation("peer", WireFixtures.Delete(Rectangle));
+
+        page.WaitForAssertion(() => Assert.Empty(page.FindAll("[data-testid='layer-rectangle']")));
+    }
+
+    [Fact]
+    public void AParticipantWhoJoinsAppearsInTheHeaderOnce()
+    {
+        ArrangeBoard("Roadmap", []);
+        var page = Render<BoardPage>(parameters => parameters.Add(component => component.BoardId, Board));
+        page.WaitForAssertion(() => Assert.Single(_hub.Connections));
+
+        _hub.Latest.Listener.OnPresenceUpdated("tab-1", WireFixtures.Presence(Guid.Parse("22222222-2222-4222-8222-222222222222"), "Member 2222"));
+        _hub.Latest.Listener.OnPresenceUpdated("tab-2", WireFixtures.Presence(Guid.Parse("22222222-2222-4222-8222-222222222222"), "Member 2222"));
+
+        page.WaitForAssertion(() => Assert.Single(page.FindAll("[data-testid='participant']")));
+        Assert.Equal("Member 2222", page.Find("[data-testid='participant']").GetAttribute("title"));
     }
 
     /// <summary>Arranges a board the workspace lists, with the given layers on its canvas.</summary>
