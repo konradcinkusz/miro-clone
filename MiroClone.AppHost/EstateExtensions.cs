@@ -103,7 +103,7 @@ public static class EstateExtensions
             .WaitFor(authService);
 
     /// <summary>
-    /// Configuration keys for the end-to-end run (docs/decisions/0038-e2e-suite-is-playwright-dotnet-and-starts-its-own-estate.md).
+    /// Configuration keys for the end-to-end run (docs/decisions/0039-e2e-suite-is-playwright-dotnet-and-starts-its-own-estate.md).
     /// Unset, the estate behaves as in development: Aspire assigns the ports and PostgreSQL keeps its data volume.
     /// </summary>
     public const string EphemeralDataKey = "Estate:EphemeralData";

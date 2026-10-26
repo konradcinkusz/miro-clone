@@ -13,7 +13,7 @@ public sealed class AccountJourneyTests(EstateFixture stack) : JourneyTests(stac
     [Fact]
     public async Task SignUpOpensTheDashboardOfAnAccountWithoutAWorkspace()
     {
-        Stack.RequireRunning();
+        await Stack.RequireAuthServiceAsync();
         var account = Account.New("signup");
         await using var journey = await Journey.OpenAsync(Stack);
 
@@ -32,7 +32,7 @@ public sealed class AccountJourneyTests(EstateFixture stack) : JourneyTests(stac
     [Fact]
     public async Task SignOutEndsTheSessionSoTheDashboardAsksForSignInAgain()
     {
-        Stack.RequireRunning();
+        await Stack.RequireAuthServiceAsync();
         var (owner, _) = await Authority.CreateWorkspaceOwnerAsync("Sign-out workspace");
         await using var journey = await SignedInAsync(owner);
 

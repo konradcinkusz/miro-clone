@@ -9,7 +9,7 @@ using Xunit;
 namespace MiroClone.Web.E2E.Stack;
 
 /// <summary>
-/// The estate under test and one Chromium for every journey (WP12, ADR 0038).
+/// The estate under test and one Chromium for every journey (WP12, ADR 0039).
 /// <para>
 /// With <c>MIROCLONE_E2E_BASE_URL</c> set, the suite uses the estate at that address. Otherwise it starts the AppHost itself, on
 /// fixed ports, with an empty PostgreSQL and an RS256 key generated for this run. A missing prerequisite (no Chromium, no Docker,
@@ -90,8 +90,9 @@ public sealed class EstateFixture : IAsyncLifetime
             AuthServiceContainer = await FindAuthServiceContainerAsync();
         }
 
+        // The web app waits for authservice in the AppHost, so its health implies both. A supplied estate may lack authservice, and
+        // the journeys that need it check that themselves (RequireAuthServiceAsync).
         await WaitUntilHealthyAsync(BaseUrl + "/health");
-        await WaitUntilHealthyAsync(AuthServiceUrl + "/health/ready");
     }
 
     /// <summary>Skips the calling journey with the reason, unless the estate and the browser are running.</summary>
@@ -101,6 +102,27 @@ public sealed class EstateFixture : IAsyncLifetime
         {
             Assert.Skip(_skipReason);
         }
+    }
+
+    /// <summary>
+    /// Skips, or fails under MIROCLONE_E2E_REQUIRED, when authservice does not answer. The journeys that register, sign in or invite
+    /// call this first, so a page-only journey never waits for an identity service it does not use.
+    /// </summary>
+    public async Task RequireAuthServiceAsync()
+    {
+        RequireRunning();
+        if (await ReachableAsync(AuthServiceUrl + "/health/ready"))
+        {
+            return;
+        }
+
+        const string reason = "authservice does not answer, so the journeys that sign in cannot run.";
+        if (Environment.GetEnvironmentVariable(RequiredVariable) == "1")
+        {
+            throw new InvalidOperationException($"The end-to-end suite cannot run: {reason}");
+        }
+
+        Assert.Skip($"End-to-end journeys skipped: {reason}");
     }
 
     /// <summary>Skips the calling journey when the authservice dev outbox cannot be read.</summary>

@@ -11,7 +11,7 @@ public sealed class DashboardJourneyTests(EstateFixture stack) : JourneyTests(st
     [Fact]
     public async Task CreatingABoardOpensItsBoardPageAndListsItOnTheDashboard()
     {
-        Stack.RequireRunning();
+        await Stack.RequireAuthServiceAsync();
         var (owner, _) = await Authority.CreateWorkspaceOwnerAsync("Create workspace");
         await using var journey = await SignedInAsync(owner);
         var title = Title("Plan");
@@ -26,7 +26,7 @@ public sealed class DashboardJourneyTests(EstateFixture stack) : JourneyTests(st
     [Fact]
     public async Task SearchNarrowsTheBoardListAndAnUnmatchedSearchSaysSo()
     {
-        Stack.RequireRunning();
+        await Stack.RequireAuthServiceAsync();
         var (owner, _) = await Authority.CreateWorkspaceOwnerAsync("Search workspace");
         await using var journey = await SignedInAsync(owner);
         var wanted = Title("Wanted");
@@ -47,7 +47,7 @@ public sealed class DashboardJourneyTests(EstateFixture stack) : JourneyTests(st
     [Fact]
     public async Task FavouritingABoardListsItUnderFavouriteBoardsAndUnfavouritingRemovesIt()
     {
-        Stack.RequireRunning();
+        await Stack.RequireAuthServiceAsync();
         var (owner, _) = await Authority.CreateWorkspaceOwnerAsync("Favourite workspace");
         await using var journey = await SignedInAsync(owner);
         var title = Title("Favourite");
@@ -67,7 +67,7 @@ public sealed class DashboardJourneyTests(EstateFixture stack) : JourneyTests(st
     [Fact]
     public async Task RenamingABoardChangesItsCardAndItsBoardPage()
     {
-        Stack.RequireRunning();
+        await Stack.RequireAuthServiceAsync();
         var (owner, _) = await Authority.CreateWorkspaceOwnerAsync("Rename workspace");
         await using var journey = await SignedInAsync(owner);
         var title = Title("Before");
@@ -84,7 +84,7 @@ public sealed class DashboardJourneyTests(EstateFixture stack) : JourneyTests(st
     [Fact]
     public async Task DeletingTheLastBoardShowsTheEmptyWorkspace()
     {
-        Stack.RequireRunning();
+        await Stack.RequireAuthServiceAsync();
         var (owner, _) = await Authority.CreateWorkspaceOwnerAsync("Delete workspace");
         await using var journey = await SignedInAsync(owner);
         var title = Title("Doomed");
@@ -100,7 +100,7 @@ public sealed class DashboardJourneyTests(EstateFixture stack) : JourneyTests(st
     [Fact]
     public async Task TheNewBoardDialogKeepsFocusInsideAndReturnsItOnEscape()
     {
-        Stack.RequireRunning();
+        await Stack.RequireAuthServiceAsync();
         var (owner, _) = await Authority.CreateWorkspaceOwnerAsync("Focus workspace");
         await using var journey = await SignedInAsync(owner);
 

@@ -11,7 +11,7 @@ public sealed class BoardJourneyTests(EstateFixture stack) : JourneyTests(stack)
     [Fact]
     public async Task ShapesDrawnOnABoardAreStillThereAfterAReload()
     {
-        Stack.RequireRunning();
+        await Stack.RequireAuthServiceAsync();
         var (owner, _) = await Authority.CreateWorkspaceOwnerAsync("Reload workspace");
         await using var journey = await SignedInAsync(owner);
         await journey.CreateBoardAsync(Title("Persisted"));
@@ -28,7 +28,7 @@ public sealed class BoardJourneyTests(EstateFixture stack) : JourneyTests(stack)
     [Fact]
     public async Task ASecondPersonSeesTheShapesAndTheCursorOfTheFirstLive()
     {
-        Stack.RequireRunning();
+        await Stack.RequireAuthServiceAsync();
         var (owner, organization) = await Authority.CreateWorkspaceOwnerAsync("Live workspace");
         var member = await Authority.AddMemberAsync(owner, organization);
         await using var first = await SignedInAsync(owner);
@@ -44,13 +44,14 @@ public sealed class BoardJourneyTests(EstateFixture stack) : JourneyTests(stack)
         await first.MovePointerOverCanvasAsync();
 
         await Expect(second.Page.GetByTestId("remote-cursor")).ToHaveCountAsync(1);
-        await Expect(first.Page.GetByTestId("connection-banner")).ToHaveAttributeAsync("data-state", "live");
+        // The banner is shown only while the connection is not live, so its absence is the live check.
+        await Expect(first.Page.GetByTestId("connection-banner")).ToHaveCountAsync(0);
     }
 
     [Fact]
     public async Task ABoardOfAnotherWorkspaceAnswersBoardNotFound()
     {
-        Stack.RequireRunning();
+        await Stack.RequireAuthServiceAsync();
         var (owner, _) = await Authority.CreateWorkspaceOwnerAsync("Owner workspace");
         var (outsider, _) = await Authority.CreateWorkspaceOwnerAsync("Outside workspace");
         await using var insider = await SignedInAsync(owner);

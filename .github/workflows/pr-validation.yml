@@ -60,7 +60,7 @@ jobs:
             dotnet test --project "$project" --no-build --configuration Release
           done
 
-  # Browser journeys against the whole estate, started by the suite from the AppHost (WP12, ADR 0038). Docker is on the runner,
+  # Browser journeys against the whole estate, started by the suite from the AppHost (WP12, ADR 0039). Docker is on the runner,
   # so PostgreSQL and the pinned authservice image run here. MIROCLONE_E2E_REQUIRED makes a missing browser or Docker fail the job
   # instead of skipping the journeys.
   e2e:

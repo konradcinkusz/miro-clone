@@ -24,7 +24,7 @@ public abstract class JourneyTests(EstateFixture stack) : IDisposable
         try
         {
             await journey.SignInAsync(account);
-            await journey.OpenDashboardAsync();
+            await Microsoft.Playwright.Assertions.Expect(journey.Page.GetByTestId("dashboard-heading")).ToBeVisibleAsync();
             return journey;
         }
         catch

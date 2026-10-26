@@ -27,7 +27,7 @@ public sealed class LayoutJourneyTests(EstateFixture stack) : JourneyTests(stack
     [Fact]
     public async Task TheDashboardFitsAPhoneWidthWithoutHorizontalScroll()
     {
-        Stack.RequireRunning();
+        await Stack.RequireAuthServiceAsync();
         var (owner, _) = await Authority.CreateWorkspaceOwnerAsync("Phone workspace");
         await using var journey = await SignedInAsync(owner, Phone);
 

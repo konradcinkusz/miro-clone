@@ -79,7 +79,7 @@ Not machine-checked: user-facing strings in the kernel (ADR 0005 says review enf
 | `secret-scan`: gitleaks over history | Every PR and push, weekly, on demand | Success (PR #14 and #15) |
 | Pre-commit gitleaks | Developer machine, after `scripts/install-hooks.sh` | Refuses to commit without gitleaks installed |
 | Fly.io deploy and preview workflows | **Not run.** Manual dispatch only (ADR 0026) | Disabled |
-| End-to-end browser suite (Playwright; AGENTS.md calls it `Web.E2E`) | **Not in the repository.** WP12 is in progress | Not run |
+| End-to-end browser suite (Playwright, `tests/MiroClone.Web.E2E`) | `e2e` job in `pr-validation`: the suite starts the estate and drives the journeys (ADR 0039, ADR 0040). Skips with a reason outside CI | See the `e2e` check on the pull request |
 
 ## 5. What has never run
 
