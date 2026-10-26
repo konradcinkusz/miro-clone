@@ -1,0 +1,84 @@
+@using System.Globalization
+@using Microsoft.AspNetCore.Components.Web
+@using MiroClone.Web.Canvas.Interaction
+@using MiroClone.Web.Canvas.Interop
+@implements IAsyncDisposable
+@inject ICanvasPointerSource Pointer
+
+<svg class="board-surface" tabindex="0" role="group" aria-label="Board canvas" data-testid="canvas-surface"
+     @ref="surface" @onkeydown="HandleKey">
+    <g transform="@WorldTransform()" data-testid="canvas-world">
+        @foreach (var layer in Frame.Layers)
+        {
+            <LayerPreview Layer="layer" />
+        }
+        @if (Frame.Net is { } net)
+        {
+            <rect class="board-net" data-testid="selection-net"
+                  x="@SvgFormat.Num(net.X)" y="@SvgFormat.Num(net.Y)" width="@SvgFormat.Num(net.Width)" height="@SvgFormat.Num(net.Height)" />
+        }
+        @if (Frame.SelectionBounds is { } box)
+        {
+            <rect class="board-selection" data-testid="selection-box"
+                  x="@SvgFormat.Num(box.X)" y="@SvgFormat.Num(box.Y)" width="@SvgFormat.Num(box.Width)" height="@SvgFormat.Num(box.Height)" />
+            @foreach (var handle in Frame.Handles)
+            {
+                <rect class="board-handle" data-testid="@HandleTestId(handle)"
+                      x="@SvgFormat.Num(handle.Square.X)" y="@SvgFormat.Num(handle.Square.Y)"
+                      width="@SvgFormat.Num(handle.Square.Width)" height="@SvgFormat.Num(handle.Square.Height)" />
+            }
+        }
+    </g>
+</svg>
+
+@code {
+    private ElementReference surface;
+    private readonly CancellationTokenSource lifetime = new();
+
+    /// <summary>What to draw. The page builds it from the editor after each change.</summary>
+    [Parameter, EditorRequired]
+    public CanvasFrame Frame { get; set; } = null!;
+
+    /// <summary>Pointer and wheel input, already in screen pixels relative to the surface.</summary>
+    [Parameter, EditorRequired]
+    public EventCallback<CanvasInput> OnInput { get; set; }
+
+    /// <summary>A key press while the surface has focus.</summary>
+    [Parameter, EditorRequired]
+    public EventCallback<string> OnKey { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        try
+        {
+            // Pointer input arrives from the browser, off the component's dispatcher, so it is marshalled back before the page reacts (blazor-web-app §6).
+            await Pointer.AttachAsync(surface, input => InvokeAsync(() => OnInput.InvokeAsync(input)), lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
+        {
+            // The page closed while the module was loading. Nothing is attached, so nothing needs undoing.
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        lifetime.Cancel();
+        lifetime.Dispose();
+        await Pointer.DisposeAsync();
+    }
+
+    private string WorldTransform()
+    {
+        var camera = Frame.Camera;
+        return FormattableString.Invariant($"matrix({camera.Zoom} 0 0 {camera.Zoom} {camera.OffsetX} {camera.OffsetY})");
+    }
+
+    private static string HandleTestId(HandleMark handle) => "handle-" + handle.Handle.ToString().ToLowerInvariant();
+
+    private Task HandleKey(KeyboardEventArgs args) => OnKey.InvokeAsync(args.Key);
+}

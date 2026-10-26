@@ -1,0 +1,26 @@
+@using MiroClone.Web.Canvas.Core
+
+@switch (Layer.Type)
+{
+    case LayerType.Rectangle:
+        <RectangleLayer Layer="Layer" />
+        break;
+    case LayerType.Ellipse:
+        <EllipseLayer Layer="Layer" />
+        break;
+    case LayerType.Text:
+        <TextLayer Layer="Layer" />
+        break;
+    case LayerType.Note:
+        <NoteLayer Layer="Layer" />
+        break;
+    case LayerType.Path:
+        <PathLayer Layer="Layer" />
+        break;
+}
+
+@code {
+    /// <summary>One layer, drawn by its type. The layer is data; the markup adds no rule of its own.</summary>
+    [Parameter, EditorRequired]
+    public Layer Layer { get; set; } = null!;
+}

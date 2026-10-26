@@ -1,0 +1,11 @@
+@using MiroClone.Web.Canvas.Core
+
+<ellipse class="board-layer" data-testid="layer-ellipse" data-layer-id="@Layer.Id"
+         cx="@SvgFormat.Num(Layer.X + Layer.Width / 2)" cy="@SvgFormat.Num(Layer.Y + Layer.Height / 2)"
+         rx="@SvgFormat.Num(Layer.Width / 2)" ry="@SvgFormat.Num(Layer.Height / 2)"
+         fill="@Layer.Fill.ToHex()" />
+
+@code {
+    [Parameter, EditorRequired]
+    public Layer Layer { get; set; } = null!;
+}

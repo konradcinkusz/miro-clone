@@ -1,0 +1,17 @@
+@using MiroClone.Web.Canvas.Core
+
+<rect class="board-layer" data-testid="layer-note" data-layer-id="@Layer.Id"
+      x="@SvgFormat.Num(Layer.X)" y="@SvgFormat.Num(Layer.Y)"
+      width="@SvgFormat.Num(Layer.Width)" height="@SvgFormat.Num(Layer.Height)"
+      fill="@Layer.Fill.ToHex()" />
+<text class="board-text" data-testid="note-text" data-layer-id="@Layer.Id"
+      x="@SvgFormat.Num(Layer.X + Padding)" y="@SvgFormat.Num(Layer.Y + Padding)"
+      dominant-baseline="hanging">@Layer.Value</text>
+
+@code {
+    /// <summary>Inset from the note's top-left corner, in world units.</summary>
+    private const double Padding = 12;
+
+    [Parameter, EditorRequired]
+    public Layer Layer { get; set; } = null!;
+}
