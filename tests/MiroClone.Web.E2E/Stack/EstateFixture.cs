@@ -170,14 +170,10 @@ public sealed class EstateFixture : IAsyncLifetime
         var webPort = FreePort();
         var authPort = FreePort();
         var project = Path.Combine(RepositoryRoot(), "MiroClone.AppHost", "MiroClone.AppHost.csproj");
-#if DEBUG
-        const string configuration = "Debug";
-#else
-        const string configuration = "Release";
-#endif
-
+        // No --configuration: the Aspire CLI that dotnet run hands the AppHost to starts its bin/Debug build, and dotnet run
+        // builds that when it is missing. A Release-only build of the AppHost makes the start fail.
         var start = new ProcessStartInfo("dotnet") { UseShellExecute = false };
-        foreach (var argument in new[] { "run", "--project", project, "--configuration", configuration })
+        foreach (var argument in new[] { "run", "--project", project })
         {
             start.ArgumentList.Add(argument);
         }
