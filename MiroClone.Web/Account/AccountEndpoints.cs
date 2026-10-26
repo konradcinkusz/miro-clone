@@ -2,7 +2,9 @@ using MiroClone.Web.Auth;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.WebUtilities;
+using MiroClone.ServiceDefaults;
 
 namespace MiroClone.Web.Account;
 
@@ -17,7 +19,9 @@ public static class AccountEndpoints
 
     public static IEndpointRouteBuilder MapAccountEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var account = endpoints.MapGroup("/account");
+        // The auth policy covers every form that checks a password or sends a message. Sign-out is left out: ending a session must
+        // always work (ADR 0045).
+        var account = endpoints.MapGroup("/account").RequireRateLimiting(RateLimitPolicies.Auth);
         account.MapPost("/sign-in", SignIn);
         account.MapPost("/sign-up", SignUp);
         account.MapPost("/verify-email", VerifyEmail);
@@ -25,7 +29,7 @@ public static class AccountEndpoints
         account.MapPost("/forgot-password", ForgotPassword);
         account.MapPost("/reset-password", ResetPassword);
         account.MapPost("/consent", AcceptConsent);
-        account.MapPost("/sign-out", SignOut);
+        account.MapPost("/sign-out", SignOut).DisableRateLimiting();
         return endpoints;
     }
 

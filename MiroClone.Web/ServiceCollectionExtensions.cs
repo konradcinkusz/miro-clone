@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using MiroClone.ServiceDefaults;
+using MiroClone.Web.Account;
 using MiroClone.Web.Api;
 using MiroClone.Web.Auth;
 using MiroClone.Web.Canvas.Interop;
@@ -31,6 +32,7 @@ public static class ServiceCollectionExtensions
         services.AddCascadingAuthenticationState();
         services.AddAuthorization();
         services.AddDistributedMemoryCache();
+        services.AddAccountRateLimiting(configuration);
         services.TryAddSingleton(TimeProvider.System);
         services.Configure<SessionSettings>(configuration.GetSection(SessionSettings.SectionName));
 

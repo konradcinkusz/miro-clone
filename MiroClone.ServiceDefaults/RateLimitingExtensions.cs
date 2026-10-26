@@ -43,7 +43,11 @@ public static class RateLimitingExtensions
     /// Registers the three standard policies. Partitions are the user id, falling back to the client address, so one
     /// NAT or one proxy does not share a single bucket. Call UseRateLimiter after UseAuthentication, so the user is known.
     /// </summary>
-    public static IServiceCollection AddStandardRateLimiting(this IServiceCollection services, IConfiguration configuration)
+    /// <param name="globalLimit">
+    /// False leaves out the catch-all limiter, which applies to every request. The web app turns it off: its pages, static
+    /// assets and circuit requests would share one budget, and the auth policy is its brute-force control (ADR 0045).
+    /// </param>
+    public static IServiceCollection AddStandardRateLimiting(this IServiceCollection services, IConfiguration configuration, bool globalLimit = true)
     {
         var settings = configuration.GetSection(RateLimitingOptions.SectionName).Get<RateLimitingOptions>()
             ?? new RateLimitingOptions();
@@ -53,10 +57,13 @@ public static class RateLimitingExtensions
             limiter.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             limiter.OnRejected = WriteRejectionAsync;
 
-            limiter.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
-                RateLimitPartition.GetFixedWindowLimiter(
-                    PartitionKey(context, settings),
-                    _ => Window(settings, settings.GlobalPermitLimit)));
+            if (globalLimit)
+            {
+                limiter.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        PartitionKey(context, settings),
+                        _ => Window(settings, settings.GlobalPermitLimit)));
+            }
 
             limiter.AddPolicy<string>(RateLimitPolicies.Auth, context =>
                 RateLimitPartition.GetFixedWindowLimiter(
