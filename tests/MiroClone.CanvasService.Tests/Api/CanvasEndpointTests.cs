@@ -98,8 +98,9 @@ public sealed class CanvasEndpointTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task AMemberPurgesTheBoardAndItsSnapshotIsDeleted()
+    public async Task AMemberCannotPurgeTheCanvasOfABoardThatStillExists()
     {
+        // The purge is for a deleted board (ADR 0043). BoardsService still shows this board, so the canvas must stay.
         var registry = _app.Services.GetRequiredService<CanvasRegistry>();
         var canvas = await registry.GetOrLoadAsync(_board, TestTokens.Workspace, TestContext.Current.CancellationToken);
         canvas.Apply(new LayerMutation(MutationKind.Upsert, new Layer(Guid.NewGuid(), LayerType.Ellipse, 0, 0, 1, 1, new Rgb(0, 0, 0))));
@@ -110,9 +111,9 @@ public sealed class CanvasEndpointTests : IAsyncLifetime
 
         var response = await _client.SendAsync(request, TestContext.Current.CancellationToken);
 
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-        Assert.Null(registry.TryGet(_board));
-        Assert.Null(_app.Services.GetRequiredService<FakeSnapshotStore>().Row(_board));
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.NotNull(registry.TryGet(_board));
+        Assert.NotNull(_app.Services.GetRequiredService<FakeSnapshotStore>().Row(_board));
     }
 
     [Fact]
@@ -130,12 +131,30 @@ public sealed class CanvasEndpointTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task TheOwningWorkspacePurgesADeletedBoardWithoutAskingBoardsService()
+    public async Task TheOwningWorkspacePurgesADeletedBoard()
     {
-        // BoardsService has already deleted the board, so its access check would answer 404 and fail. The purge must not need it.
+        // BoardsService no longer shows the board to anyone, which is what a deleted board looks like from here.
+        var deleted = Guid.NewGuid();
         var registry = _app.Services.GetRequiredService<CanvasRegistry>();
-        var canvas = await registry.GetOrLoadAsync(_board, TestTokens.Workspace, TestContext.Current.CancellationToken);
+        var canvas = await registry.GetOrLoadAsync(deleted, TestTokens.Workspace, TestContext.Current.CancellationToken);
         canvas.Apply(new LayerMutation(MutationKind.Upsert, new Layer(Guid.NewGuid(), LayerType.Ellipse, 0, 0, 1, 1, new Rgb(0, 0, 0))));
+        registry.MarkDirty(deleted);
+        await registry.FlushAsync(TestContext.Current.CancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"/api/canvas/{deleted:D}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", TestTokens.Issue(_member));
+
+        var response = await _client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Null(registry.TryGet(deleted));
+        Assert.Null(_app.Services.GetRequiredService<FakeSnapshotStore>().Row(deleted));
+    }
+
+    [Fact]
+    public async Task APurgeFailsClosedWhenBoardsServiceCannotSayWhetherTheBoardIsDeleted()
+    {
+        var registry = _app.Services.GetRequiredService<CanvasRegistry>();
+        await registry.GetOrLoadAsync(_board, TestTokens.Workspace, TestContext.Current.CancellationToken);
         registry.MarkDirty(_board);
         await registry.FlushAsync(TestContext.Current.CancellationToken);
         _app.Services.GetRequiredService<FakeBoardAccess>().Unavailable = true;
@@ -144,8 +163,8 @@ public sealed class CanvasEndpointTests : IAsyncLifetime
 
         var response = await _client.SendAsync(request, TestContext.Current.CancellationToken);
 
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-        Assert.Null(_app.Services.GetRequiredService<FakeSnapshotStore>().Row(_board));
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.NotNull(_app.Services.GetRequiredService<FakeSnapshotStore>().Row(_board));
     }
 
     [Fact]
