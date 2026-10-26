@@ -1,5 +1,9 @@
 # Deployment
 
+> **Deployment is disabled by owner decision (ADR 0026).** Nothing is deployed to Fly.io. The Fly workflows have no automatic triggers
+> (no `v*` tag push, no pull-request events); they run only by manual dispatch. Do not dispatch them while this stands. To re-enable,
+> restore the triggers listed in ADR 0026 ("How to re-enable"), then follow the owner steps below.
+
 How the estate reaches Fly.io, what the owner does once, and what to check on each deploy. The decisions are in ADR 0017–0021. The
 standards applied are `fly-io-deployment`, `pr-preview-environments` and `shared-service-reuse`.
 

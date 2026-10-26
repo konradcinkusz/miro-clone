@@ -17,7 +17,7 @@ Instructions for coding agents and contributors. `CLAUDE.md` imports this file.
 | `.github/workflows/` | `pr-validation` (restore/build/test), `secret-scan` (gitleaks) | WP00 |
 | `flyio/` | Fly.io config, one `*.fly.toml` per app, `SECRETS.md`, `INFRASTRUCTURE-ANALYSIS.md` | WP13 |
 | `MiroClone.*/Dockerfile`, `.dockerignore` | Production images; build context is the repository root | WP13 |
-| `.github/workflows/flyio*.yml` | Tag deploy (`flyio.yml`), PR previews and teardown, dev destroy. Secrets come from environment `dev-fly` | WP13 |
+| `.github/workflows/flyio*.yml` | Fly workflows, **disabled by owner decision (ADR 0026)**: no automatic triggers, manual dispatch only. Previously tag deploy (`flyio.yml`), PR previews and teardown. Secrets come from environment `dev-fly` | WP13 |
 | `scripts/flyio-pr-database.sh` | Creates or drops a preview's databases and role on the dev PostgreSQL | WP13 |
 | `docs/DEPLOYMENT.md` | Owner steps, verification after the first deploy, operations | WP13 |
 | `.githooks/` + `scripts/install-hooks.sh` | Pre-commit gitleaks hook (fails closed) | WP00 |
