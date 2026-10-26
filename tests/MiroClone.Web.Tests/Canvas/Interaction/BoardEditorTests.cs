@@ -130,7 +130,7 @@ public sealed class BoardEditorTests
 
         editor.Apply(Down(10, 10));
         editor.Apply(Move(60, 10));
-        editor.Key("Escape");
+        editor.Key(Plain("Escape"));
 
         Assert.Empty(session.Commits);
         Assert.Equal(0, editor.Frame().Layers.Single().X);
@@ -228,7 +228,7 @@ public sealed class BoardEditorTests
         editor.Apply(Down(25, 25, additive: true));
         editor.Apply(Up(25, 25, additive: true));
 
-        editor.Key("Delete");
+        editor.Key(Plain("Delete"));
 
         Assert.Single(session.Commits);
         Assert.Equal(0, session.Document.Count);
@@ -240,7 +240,7 @@ public sealed class BoardEditorTests
     {
         var session = new RecordingSession([Rectangle(0, 0, 10, 10)]);
 
-        new BoardEditor(session).Key("Backspace");
+        new BoardEditor(session).Key(Plain("Backspace"));
 
         Assert.Empty(session.Commits);
     }
@@ -340,6 +340,134 @@ public sealed class BoardEditorTests
         Assert.Equal(BoardEditor.HandlePixels / editor.Camera.Zoom, handle.Width, 6);
     }
 
+    [Fact]
+    public void CtrlZUndoesTheLastGestureAndCtrlShiftZRedoesIt()
+    {
+        var session = new RecordingSession([]);
+        var editor = new BoardEditor(session, () => NewId);
+        editor.SelectTool(CanvasTool.Rectangle);
+        editor.Apply(Down(0, 0));
+        editor.Apply(Up(50, 50));
+
+        editor.Key(new KeyInput("z", Ctrl: true, Shift: false));
+        Assert.Equal(0, session.Document.Count);
+        Assert.True(editor.Frame().CanRedo);
+
+        editor.Key(new KeyInput("Z", Ctrl: true, Shift: true));
+        Assert.Equal(1, session.Document.Count);
+    }
+
+    [Fact]
+    public void BringToFrontAndSendToBackMoveTheSelectionAsOneStep()
+    {
+        var a = Rectangle(0, 0, 10, 10);
+        var b = Rectangle(20, 0, 10, 10);
+        var c = Rectangle(40, 0, 10, 10);
+        var session = new RecordingSession([a, b, c]);
+        var editor = new BoardEditor(session);
+        editor.Apply(Down(5, 5));
+        editor.Apply(Up(5, 5));
+
+        editor.BringToFront();
+        Assert.Equal(new[] { b.Id, c.Id, a.Id }, session.Document.Order);
+
+        editor.SendToBack();
+        Assert.Equal(new[] { a.Id, b.Id, c.Id }, session.Document.Order);
+        Assert.Equal(2, session.Commits.Count);
+    }
+
+    [Fact]
+    public void SetFillRecoloursEverySelectedLayerInOneStep()
+    {
+        var a = Rectangle(0, 0, 10, 10);
+        var b = Rectangle(20, 0, 10, 10);
+        var session = new RecordingSession([a, b]);
+        var editor = new BoardEditor(session);
+        editor.SelectAll();
+
+        var red = Palette.Colours[0].Colour;
+        editor.SetFill(red);
+
+        Assert.Single(session.Commits);
+        Assert.All(session.Document.Ordered(), layer => Assert.Equal(red, layer.Fill));
+    }
+
+    [Fact]
+    public void TypingIntoATextLayerCommitsTheTextWhenEditingFinishes()
+    {
+        var session = new RecordingSession([]);
+        var editor = new BoardEditor(session, () => NewId);
+        editor.SelectTool(CanvasTool.Text);
+        editor.Apply(Down(30, 40));
+        editor.Apply(Up(30, 40));
+
+        Assert.NotNull(editor.Frame().Editing);
+        editor.EditText("Hello");
+        editor.FinishEdit();
+
+        Assert.Null(editor.Frame().Editing);
+        Assert.Equal("Hello", Assert.Single(session.Document.Ordered()).Value);
+        Assert.Equal(2, session.Commits.Count);
+    }
+
+    [Fact]
+    public void AnEmptyTextLayerIsRemovedWhenEditingFinishes()
+    {
+        var session = new RecordingSession([]);
+        var editor = new BoardEditor(session, () => NewId);
+        editor.SelectTool(CanvasTool.Note);
+        editor.Apply(Down(0, 0));
+        editor.Apply(Up(0, 0));
+
+        editor.FinishEdit();
+
+        Assert.Equal(0, session.Document.Count);
+        Assert.Empty(editor.Frame().Selection);
+    }
+
+    [Fact]
+    public void TheKeyboardBelongsToTheTextOverlayWhileItIsOpen()
+    {
+        var session = new RecordingSession([Rectangle(0, 0, 10, 10)]);
+        var editor = new BoardEditor(session);
+        editor.SelectTool(CanvasTool.Text);
+        editor.Apply(Down(30, 40));
+        editor.Apply(Up(30, 40));
+
+        editor.Key(Plain("Delete"));
+        editor.Key(new KeyInput("z", Ctrl: true, Shift: false));
+
+        Assert.Equal(2, session.Document.Count);
+        Assert.NotNull(editor.Frame().Editing);
+    }
+
+    [Fact]
+    public void EnterEditsTheOneSelectedTextLayer()
+    {
+        var text = new Layer(Guid.NewGuid(), LayerType.Text, 0, 0, 100, 40, new Rgb(0, 0, 0), "old");
+        var editor = new BoardEditor(new RecordingSession([text]));
+        editor.Apply(Down(5, 5));
+        editor.Apply(Up(5, 5));
+
+        editor.Key(Plain("Enter"));
+
+        Assert.Equal(text.Id, editor.Frame().Editing!.Id);
+        Assert.Equal("old", editor.Frame().Editing!.Text);
+    }
+
+    [Fact]
+    public void SelectAllSelectsEveryLayer()
+    {
+        var session = new RecordingSession([Rectangle(0, 0, 10, 10), Rectangle(20, 0, 10, 10)]);
+        var editor = new BoardEditor(session);
+
+        editor.Key(new KeyInput("a", Ctrl: true, Shift: false));
+
+        Assert.Equal(2, editor.Frame().Selection.Count);
+    }
+
+    private static KeyInput Plain(string key) => new(key, Ctrl: false, Shift: false);
+
     private static Layer Rectangle(double x, double y, double width, double height) =>
         new(Guid.NewGuid(), LayerType.Rectangle, x, y, width, height, new Rgb(1, 2, 3));
 
@@ -360,6 +488,14 @@ public sealed class BoardEditorTests
         public List<IReadOnlyList<LayerMutation>> Commits { get; } = [];
 
         public CanvasDocument Document => _inner.Document;
+
+        public bool CanUndo => _inner.CanUndo;
+
+        public bool CanRedo => _inner.CanRedo;
+
+        public IReadOnlyList<LayerMutation> Undo() => _inner.Undo();
+
+        public IReadOnlyList<LayerMutation> Redo() => _inner.Redo();
 
         public IReadOnlyList<LayerMutation> Commit(IReadOnlyList<LayerMutation> mutations)
         {

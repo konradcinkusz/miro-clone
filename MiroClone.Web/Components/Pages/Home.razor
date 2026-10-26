@@ -5,6 +5,7 @@
 @using MiroClone.Web.Auth
 @using MiroClone.Web.Components.Dashboard
 @using MiroClone.Web.Components.Shared
+@using Microsoft.JSInterop
 @inject ICurrentSession Session
 @inject AuthorityClient Authority
 @inject BoardsClient Boards
@@ -34,7 +35,7 @@
                 </div>
                 @if (IsActive && Membership.CanInvite(ActiveRole()))
                 {
-                    <button type="button" class="btn" data-testid="invite-open" @onclick="OpenInvite">Invite members</button>
+                    <button type="button" class="btn" data-testid="invite-open" @ref="inviteOpener" @onclick="OpenInvite">Invite members</button>
                 }
             </div>
 
@@ -76,7 +77,7 @@
                         <div class="empty-state" data-testid="boards-empty">
                             <h2>Create your first board.</h2>
                             <p>Start by creating a board for your workspace.</p>
-                            <button type="button" class="btn btn-primary" data-testid="empty-create" @onclick="OpenCreate">Create board</button>
+                            <button type="button" class="btn btn-primary" data-testid="empty-create" @ref="createOpener" @onclick="OpenCreate">Create board</button>
                         </div>
                     }
                     else
@@ -84,7 +85,7 @@
                         <p class="muted" data-testid="boards-total">@boards.Total @(boards.Total == 1 ? "board" : "boards") in this workspace.</p>
                         <ul class="board-grid" data-testid="board-grid">
                             <li>
-                                <button type="button" class="board-new" data-testid="new-board" @onclick="OpenCreate">
+                                <button type="button" class="board-new" data-testid="new-board" @ref="createOpener" @onclick="OpenCreate">
                                     <span class="board-new-plus" aria-hidden="true">+</span>
                                     <span>New board</span>
                                 </button>
@@ -131,25 +132,25 @@
             @if (createOpen)
             {
                 <BoardTitleDialog Heading="New board" SubmitLabel="Create board" TestId="new-board-dialog" Busy="@dialogBusy"
-                                  Error="@dialogError" OnSubmit="CreateBoardAsync" OnCancel="CloseDialogs" />
+                                  Error="@dialogError" OnSubmit="CreateBoardAsync" OnCancel="CloseDialogsAsync" />
             }
 
             @if (renameTarget is { } rename)
             {
                 <BoardTitleDialog Heading="Rename board" SubmitLabel="Save" Initial="@rename.Title" TestId="rename-dialog" Busy="@dialogBusy"
-                                  Error="@dialogError" OnSubmit="RenameBoardAsync" OnCancel="CloseDialogs" />
+                                  Error="@dialogError" OnSubmit="RenameBoardAsync" OnCancel="CloseDialogsAsync" />
             }
 
             @if (deleteTarget is { } doomed)
             {
                 <ConfirmDeleteDialog Name="@doomed.Title" Busy="@dialogBusy" Error="@dialogError"
-                                     OnConfirm="DeleteBoardAsync" OnCancel="CloseDialogs" />
+                                     OnConfirm="DeleteBoardAsync" OnCancel="CloseDialogsAsync" />
             }
 
             @if (inviteOpen)
             {
                 <InviteDialog OrganizationName="@ActiveOrganizationName()" Busy="@inviteBusy" Error="@inviteError" Notice="@inviteNotice"
-                              OnInvite="InviteAsync" OnCancel="CloseDialogs" />
+                              OnInvite="InviteAsync" OnCancel="CloseDialogsAsync" />
             }
         }
     </section>
@@ -181,6 +182,8 @@
     private bool createOpen;
     private BoardSummaryDto? renameTarget;
     private BoardSummaryDto? deleteTarget;
+    private ElementReference createOpener;
+    private ElementReference inviteOpener;
     private bool dialogBusy;
     private string? dialogError;
 
@@ -320,8 +323,22 @@
         inviteOpen = true;
     }
 
-    private void CloseDialogs()
+    /// <summary>
+    /// Closes whichever dialog is open. Focus goes back to the control that opened it (ADR 0034): the opener is still on the page
+    /// while the dialog is open, so the focus is moved before the dialog is removed.
+    /// </summary>
+    private async Task CloseDialogsAsync()
     {
+        ElementReference? opener = null;
+        if (createOpen)
+        {
+            opener = createOpener;
+        }
+        else if (inviteOpen)
+        {
+            opener = inviteOpener;
+        }
+
         createOpen = false;
         renameTarget = null;
         deleteTarget = null;
@@ -329,6 +346,23 @@
         dialogError = null;
         inviteError = null;
         inviteNotice = null;
+
+        if (opener is { } target)
+        {
+            await ReturnFocusAsync(target);
+        }
+    }
+
+    private static async Task ReturnFocusAsync(ElementReference opener)
+    {
+        try
+        {
+            await opener.FocusAsync();
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or JSException or JSDisconnectedException)
+        {
+            // The opener is no longer on the page, or the circuit is closing. Focus stays where the browser put it.
+        }
     }
 
     private void ClearMessages()
@@ -346,10 +380,10 @@
         dialogError = null;
         try
         {
+            // The new board opens at once (ADR 0034 closes the gap ADR 0027 named). The board page is WP09's and reads the id from the address.
             var created = await Boards.CreateAsync(sessionId!, title);
             createOpen = false;
-            notice = $"Board \"{created.Title}\" created.";
-            await LoadBoardsAsync();
+            Navigation.NavigateTo($"/board/{created.Id:D}");
         }
         catch (HttpRequestException ex)
         {

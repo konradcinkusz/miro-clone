@@ -85,7 +85,7 @@ public sealed class DashboardPageTests : IDisposable
     }
 
     [Fact]
-    public void CreatingABoardSendsTheTitleAndShowsItInTheList()
+    public void CreatingABoardSendsTheTitleAndOpensTheNewBoard()
     {
         Arrange();
         var page = Render();
@@ -95,10 +95,10 @@ public sealed class DashboardPageTests : IDisposable
         page.Find("[data-testid='board-title-input']").Input("  Roadmap  ");
         page.Find("[data-testid='board-title-form']").Submit();
 
-        page.WaitForAssertion(() => Assert.Contains("Board \"Roadmap\" created.", page.Find("[data-testid='dashboard-notice']").TextContent));
-        Assert.Single(_boards.Boards, board => board.Title == "Roadmap");
+        var created = Assert.Single(_boards.Boards, board => board.Title == "Roadmap");
+        var navigation = _context.Services.GetRequiredService<NavigationManager>();
+        page.WaitForAssertion(() => Assert.EndsWith($"/board/{created.Id:D}", navigation.Uri));
         Assert.Contains(_boards.Calls, call => call.Method == "POST" && call.Path == "api/boards" && call.Body!.Contains("\"title\":\"Roadmap\""));
-        Assert.Empty(page.FindAll("[data-testid='new-board-dialog']"));
     }
 
     [Fact]

@@ -1,38 +1,63 @@
-@using System.Globalization
 @using Microsoft.AspNetCore.Components.Web
 @using MiroClone.Web.Canvas.Interaction
 @using MiroClone.Web.Canvas.Interop
 @implements IAsyncDisposable
 @inject ICanvasPointerSource Pointer
 
-<svg class="board-surface" tabindex="0" role="group" aria-label="Board canvas" data-testid="canvas-surface"
-     @ref="surface" @onkeydown="HandleKey">
-    <g transform="@WorldTransform()" data-testid="canvas-world">
-        @foreach (var layer in Frame.Layers)
-        {
-            <LayerPreview Layer="layer" />
-        }
-        @if (Frame.Net is { } net)
-        {
-            <rect class="board-net" data-testid="selection-net"
-                  x="@SvgFormat.Num(net.X)" y="@SvgFormat.Num(net.Y)" width="@SvgFormat.Num(net.Width)" height="@SvgFormat.Num(net.Height)" />
-        }
-        @if (Frame.SelectionBounds is { } box)
-        {
-            <rect class="board-selection" data-testid="selection-box"
-                  x="@SvgFormat.Num(box.X)" y="@SvgFormat.Num(box.Y)" width="@SvgFormat.Num(box.Width)" height="@SvgFormat.Num(box.Height)" />
-            @foreach (var handle in Frame.Handles)
+<div class="board-canvas">
+    <svg class="board-surface" tabindex="0" role="group" aria-label="Board canvas" data-testid="canvas-surface"
+         @ref="surface">
+        <g transform="@WorldTransform()" data-testid="canvas-world">
+            @foreach (var layer in Frame.Layers)
             {
-                <rect class="board-handle" data-testid="@HandleTestId(handle)"
-                      x="@SvgFormat.Num(handle.Square.X)" y="@SvgFormat.Num(handle.Square.Y)"
-                      width="@SvgFormat.Num(handle.Square.Width)" height="@SvgFormat.Num(handle.Square.Height)" />
+                @* The layer being edited is drawn by the overlay instead, so the text is never shown twice. *@
+                @if (layer.Id != Frame.Editing?.Id)
+                {
+                    <LayerPreview Layer="layer" />
+                }
             }
+            @if (Frame.Net is { } net)
+            {
+                <rect class="board-net" data-testid="selection-net"
+                      x="@SvgFormat.Num(net.X)" y="@SvgFormat.Num(net.Y)" width="@SvgFormat.Num(net.Width)" height="@SvgFormat.Num(net.Height)" />
+            }
+            @if (Frame.SelectionBounds is { } box)
+            {
+                <rect class="board-selection" data-testid="selection-box"
+                      x="@SvgFormat.Num(box.X)" y="@SvgFormat.Num(box.Y)" width="@SvgFormat.Num(box.Width)" height="@SvgFormat.Num(box.Height)" />
+                @foreach (var handle in Frame.Handles)
+                {
+                    <rect class="board-handle" data-testid="@HandleTestId(handle)"
+                          x="@SvgFormat.Num(handle.Square.X)" y="@SvgFormat.Num(handle.Square.Y)"
+                          width="@SvgFormat.Num(handle.Square.Width)" height="@SvgFormat.Num(handle.Square.Height)" />
+                }
+            }
+        </g>
+    </svg>
+
+    @* A controlled field over the layer (ADR 0033). It is not contenteditable: its value is the editor's text. Keys stop here, so
+       the board's shortcuts never see a letter typed into it. *@
+    @if (Frame.Editing is { } edit)
+    {
+        @if (edit.Multiline)
+        {
+            <textarea class="board-edit board-edit-note" data-testid="note-editor" aria-label="Note text" style="@EditStyle(edit)"
+                      @ref="editor" @bind-value="EditValue" @bind-value:event="oninput" @onkeydown="HandleEditKey"
+                      @onkeydown:stopPropagation="true" @onblur="() => OnFinishEdit.InvokeAsync()"></textarea>
         }
-    </g>
-</svg>
+        else
+        {
+            <input class="board-edit" type="text" autocomplete="off" data-testid="text-editor" aria-label="Text" style="@EditStyle(edit)"
+                   @ref="editor" @bind-value="EditValue" @bind-value:event="oninput" @onkeydown="HandleEditKey"
+                   @onkeydown:stopPropagation="true" @onblur="() => OnFinishEdit.InvokeAsync()" />
+        }
+    }
+</div>
 
 @code {
     private ElementReference surface;
+    private ElementReference editor;
+    private Guid? focusedEdit;
     private readonly CancellationTokenSource lifetime = new();
 
     /// <summary>What to draw. The page builds it from the editor after each change.</summary>
@@ -43,25 +68,39 @@
     [Parameter, EditorRequired]
     public EventCallback<CanvasInput> OnInput { get; set; }
 
-    /// <summary>A key press while the surface has focus.</summary>
+    /// <summary>The text being typed into the overlay, after each keystroke.</summary>
     [Parameter, EditorRequired]
-    public EventCallback<string> OnKey { get; set; }
+    public EventCallback<string> OnEditText { get; set; }
+
+    /// <summary>The overlay is done: Enter or Escape in the field, or the field lost focus.</summary>
+    [Parameter, EditorRequired]
+    public EventCallback OnFinishEdit { get; set; }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender)
+        if (firstRender)
         {
-            return;
+            try
+            {
+                // Pointer input arrives from the browser, off the component's dispatcher, so it is marshalled back before the page reacts (blazor-web-app §6).
+                await Pointer.AttachAsync(surface, input => InvokeAsync(() => OnInput.InvokeAsync(input)), lifetime.Token);
+            }
+            catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
+            {
+                // The page closed while the module was loading. Nothing is attached, so nothing needs undoing.
+            }
         }
 
-        try
+        // A new edit takes the keyboard once; the field is focused by the framework, not by the page's script.
+        var editing = Frame.Editing?.Id;
+        if (editing is null)
         {
-            // Pointer input arrives from the browser, off the component's dispatcher, so it is marshalled back before the page reacts (blazor-web-app §6).
-            await Pointer.AttachAsync(surface, input => InvokeAsync(() => OnInput.InvokeAsync(input)), lifetime.Token);
+            focusedEdit = null;
         }
-        catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
+        else if (editing != focusedEdit)
         {
-            // The page closed while the module was loading. Nothing is attached, so nothing needs undoing.
+            focusedEdit = editing;
+            await editor.FocusAsync();
         }
     }
 
@@ -80,5 +119,32 @@
 
     private static string HandleTestId(HandleMark handle) => "handle-" + handle.Handle.ToString().ToLowerInvariant();
 
-    private Task HandleKey(KeyboardEventArgs args) => OnKey.InvokeAsync(args.Key);
+    /// <summary>Position and size follow the layer at the current zoom. The colours are layer data, passed as custom properties.</summary>
+    private static string EditStyle(TextEdit edit) =>
+        $"left:{SvgFormat.Num(edit.Box.X)}px;top:{SvgFormat.Num(edit.Box.Y)}px;" +
+        $"width:{SvgFormat.Num(edit.Box.Width)}px;height:{SvgFormat.Num(edit.Box.Height)}px;" +
+        $"font-size:{SvgFormat.Num(edit.FontPixels)}px;--ink:{edit.Ink.ToHex()};--fill:{edit.Fill.ToHex()}";
+
+    /// <summary>
+    /// The field's value is the editor's text. Each keystroke sends the new value up; the page answers with the frame, which carries
+    /// the same text back, so the field is controlled (ADR 0033).
+    /// </summary>
+    private string EditValue
+    {
+        get => Frame.Editing?.Text ?? string.Empty;
+        set => _ = OnEditText.InvokeAsync(value);
+    }
+
+    /// <summary>Escape finishes the edit, and so does Enter in a single-line field (a note takes Enter as a new line). Focus returns to the board.</summary>
+    private async Task HandleEditKey(KeyboardEventArgs args)
+    {
+        var finishes = args.Key == "Escape" || (args.Key == "Enter" && Frame.Editing is { Multiline: false });
+        if (!finishes)
+        {
+            return;
+        }
+
+        await OnFinishEdit.InvokeAsync();
+        await surface.FocusAsync();
+    }
 }

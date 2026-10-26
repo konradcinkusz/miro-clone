@@ -4,6 +4,8 @@
 @using Microsoft.AspNetCore.Authorization
 @using MiroClone.Web.Api
 @using MiroClone.Web.Auth
+@using Microsoft.AspNetCore.Components.Web
+@using MiroClone.Web.Canvas.Core
 @using MiroClone.Web.Canvas.Editing
 @using MiroClone.Web.Canvas.Interaction
 @using MiroClone.Web.Components.Board
@@ -32,11 +34,17 @@ else if (editor is not null && frame is not null)
 {
     <BoardHeader Title="@(title ?? string.Empty)" Name="@youName" />
 
-    <div class="cluster">
-        <BoardToolbar Active="editor.Tool" OnSelect="SelectTool" />
-    </div>
+    @* The keyboard is read here, on the page, so it works wherever focus is on the board: the canvas, the toolbar or the selection bar. *@
+    <div class="board-shell" @onkeydown="HandleKey">
+        <div class="cluster">
+            <BoardToolbar Active="editor.Tool" OnSelect="SelectTool" CanUndo="frame.CanUndo" CanRedo="frame.CanRedo"
+                          OnUndo="Undo" OnRedo="Redo" />
+            <SelectionBar Visible="frame.Selection.Count > 0" OnColour="SetFill" OnFront="BringToFront"
+                          OnBack="SendToBack" OnDelete="DeleteSelection" />
+        </div>
 
-    <CanvasSurface Frame="frame" OnInput="HandleInput" OnKey="HandleKey" />
+        <CanvasSurface Frame="frame" OnInput="HandleInput" OnEditText="EditText" OnFinishEdit="FinishEdit" />
+    </div>
 
     @if (frame.Notice is { } notice)
     {
@@ -136,36 +144,39 @@ else if (editor is not null && frame is not null)
         }
     }
 
-    private void HandleInput(CanvasInput input)
+    private void HandleInput(CanvasInput input) => Act(board => board.Apply(input));
+
+    /// <summary>Ctrl or Meta is read as one flag, so Ctrl+Z and Cmd+Z do the same.</summary>
+    private void HandleKey(KeyboardEventArgs args) =>
+        Act(board => board.Key(new KeyInput(args.Key, args.CtrlKey || args.MetaKey, args.ShiftKey)));
+
+    private void SelectTool(CanvasTool tool) => Act(board => board.SelectTool(tool));
+
+    private void SetFill(Rgb fill) => Act(board => board.SetFill(fill));
+
+    private void BringToFront() => Act(board => board.BringToFront());
+
+    private void SendToBack() => Act(board => board.SendToBack());
+
+    private void DeleteSelection() => Act(board => board.DeleteSelection());
+
+    private void Undo() => Act(board => board.Undo());
+
+    private void Redo() => Act(board => board.Redo());
+
+    private void EditText(string text) => Act(board => board.EditText(text));
+
+    private void FinishEdit() => Act(board => board.FinishEdit());
+
+    /// <summary>Runs one editor change, then reads the frame the markup draws. Every change comes through here.</summary>
+    private void Act(Action<BoardEditor> change)
     {
         if (editor is null)
         {
             return;
         }
 
-        editor.Apply(input);
-        frame = editor.Frame();
-    }
-
-    private void HandleKey(string key)
-    {
-        if (editor is null)
-        {
-            return;
-        }
-
-        editor.Key(key);
-        frame = editor.Frame();
-    }
-
-    private void SelectTool(CanvasTool tool)
-    {
-        if (editor is null)
-        {
-            return;
-        }
-
-        editor.SelectTool(tool);
+        change(editor);
         frame = editor.Frame();
     }
 
