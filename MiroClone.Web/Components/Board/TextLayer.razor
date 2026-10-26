@@ -2,7 +2,7 @@
 
 <text class="board-text" data-testid="layer-text" data-layer-id="@Layer.Id"
       x="@SvgFormat.Num(Layer.X + Padding)" y="@SvgFormat.Num(Layer.Y + Layer.Height / 2)"
-      dominant-baseline="middle">@Layer.Value</text>
+      dominant-baseline="middle" fill="@Layer.Fill.ToHex()">@Layer.Value</text>
 
 @code {
     /// <summary>Inset from the box edge, in world units.</summary>

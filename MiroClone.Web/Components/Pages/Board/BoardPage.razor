@@ -5,6 +5,7 @@
 @using MiroClone.ServiceDefaults
 @using MiroClone.Web.Api
 @using MiroClone.Web.Auth
+@using Microsoft.AspNetCore.Components.Web
 @using MiroClone.Web.Canvas.Core
 @using MiroClone.Web.Canvas.Editing
 @using MiroClone.Web.Canvas.Interaction
@@ -37,11 +38,17 @@ else if (session is { } live && editor is not null && frame is not null)
     <ConnectionBanner State="live.Connection" />
     <BoardHeader Title="@(title ?? string.Empty)" Participants="live.Participants" />
 
-    <div class="cluster">
-        <BoardToolbar Active="editor.Tool" OnSelect="SelectTool" />
-    </div>
+    @* The keyboard is read here, on the page, so it works wherever focus is on the board: the canvas, the toolbar or the selection bar. *@
+    <div class="board-shell" @onkeydown="HandleKey">
+        <div class="cluster">
+            <BoardToolbar Active="editor.Tool" OnSelect="SelectTool" CanUndo="frame.CanUndo" CanRedo="frame.CanRedo"
+                          OnUndo="Undo" OnRedo="Redo" />
+            <SelectionBar Visible="frame.Selection.Count > 0" OnColour="SetFill" OnFront="BringToFront"
+                          OnBack="SendToBack" OnDelete="DeleteSelection" />
+        </div>
 
-    <CanvasSurface Frame="frame" Remote="live.RemoteParticipants" OnInput="HandleInput" OnKey="HandleKey" />
+        <CanvasSurface Frame="frame" Remote="live.RemoteParticipants" OnInput="HandleInput" OnEditText="EditText" OnFinishEdit="FinishEdit" />
+    </div>
 
     @if (frame.Notice is { } notice)
     {
@@ -157,34 +164,51 @@ else if (session is { } live && editor is not null && frame is not null)
 
     private void HandleInput(CanvasInput input)
     {
-        if (editor is null)
-        {
-            return;
-        }
-
-        editor.Apply(input);
-        frame = editor.Frame();
-        if (input is PointerInput pointer)
+        // The cursor is read off the camera before the input applies, so it is where the pointer is (ADR 0034).
+        if (input is PointerInput pointer && editor is not null)
         {
             cursor = editor.Camera.ScreenToWorld(pointer.Screen);
         }
 
-        Announce();
+        Act(board => board.Apply(input));
     }
 
-    private void HandleKey(string key)
+    /// <summary>Ctrl or Meta is read as one flag, so Ctrl+Z and Cmd+Z do the same.</summary>
+    private void HandleKey(KeyboardEventArgs args) =>
+        Act(board => board.Key(new KeyInput(args.Key, args.CtrlKey || args.MetaKey, args.ShiftKey)));
+
+    private void SelectTool(CanvasTool tool) => Act(board => board.SelectTool(tool));
+
+    private void SetFill(Rgb fill) => Act(board => board.SetFill(fill));
+
+    private void BringToFront() => Act(board => board.BringToFront());
+
+    private void SendToBack() => Act(board => board.SendToBack());
+
+    private void DeleteSelection() => Act(board => board.DeleteSelection());
+
+    private void Undo() => Act(board => board.Undo());
+
+    private void Redo() => Act(board => board.Redo());
+
+    private void EditText(string text) => Act(board => board.EditText(text));
+
+    private void FinishEdit() => Act(board => board.FinishEdit());
+
+    /// <summary>Runs one editor change, then reads the frame the markup draws. Every change comes through here.</summary>
+    private void Act(Action<BoardEditor> change)
     {
         if (editor is null)
         {
             return;
         }
 
-        editor.Key(key);
+        change(editor);
         frame = editor.Frame();
         Announce();
     }
 
-    /// <summary>A remote change, a participant or the connection changed. Runs on the circuit, so the page reacts directly.</summary>
+    /// <summary>A remote change, a participant or the connection changed. Runs on the page's dispatcher, so the page reacts directly.</summary>
     private void OnRealtimeChanged() => _ = InvokeAsync(() =>
     {
         // A remote delete may have removed a selected layer; the selection is brought back in line before the frame is drawn.
@@ -199,17 +223,6 @@ else if (session is { } live && editor is not null && frame is not null)
 
     /// <summary>Tells the room where this user's pointer is and what is selected (ADR 0034). The session paces the sends.</summary>
     private void Announce() => session?.SetPresence(cursor, frame?.Selection ?? []);
-
-    private void SelectTool(CanvasTool tool)
-    {
-        if (editor is null)
-        {
-            return;
-        }
-
-        editor.SelectTool(tool);
-        frame = editor.Frame();
-    }
 
     private async Task CloseSessionAsync()
     {

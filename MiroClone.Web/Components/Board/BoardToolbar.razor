@@ -9,6 +9,10 @@
                 data-testid="tool-@tool.ToString().ToLowerInvariant()"
                 @onclick="() => OnSelect.InvokeAsync(tool)">@label</button>
     }
+    <button type="button" class="btn btn-quiet" data-testid="undo" title="Undo (Ctrl+Z)"
+            disabled="@(!CanUndo)" @onclick="() => OnUndo.InvokeAsync()">Undo</button>
+    <button type="button" class="btn btn-quiet" data-testid="redo" title="Redo (Ctrl+Shift+Z)"
+            disabled="@(!CanRedo)" @onclick="() => OnRedo.InvokeAsync()">Redo</button>
 </nav>
 
 @code {
@@ -27,4 +31,16 @@
 
     [Parameter, EditorRequired]
     public EventCallback<CanvasTool> OnSelect { get; set; }
+
+    [Parameter]
+    public bool CanUndo { get; set; }
+
+    [Parameter]
+    public bool CanRedo { get; set; }
+
+    [Parameter]
+    public EventCallback OnUndo { get; set; }
+
+    [Parameter]
+    public EventCallback OnRedo { get; set; }
 }

@@ -31,8 +31,18 @@ public sealed record PointerInput(PointerPhase Phase, Point Screen, bool Primary
 /// <param name="Zoom">Ctrl or Meta is held: zoom at the pointer. Otherwise the wheel pans.</param>
 public sealed record WheelInput(Point Screen, double DeltaX, double DeltaY, bool Zoom) : CanvasInput;
 
+/// <summary>A key press from the board page. Ctrl is true for Ctrl or Meta.</summary>
+/// <param name="Key">The browser's key name, such as <c>Delete</c>, <c>Enter</c> or <c>z</c>.</param>
+public sealed record KeyInput(string Key, bool Ctrl, bool Shift);
+
 /// <summary>A selection handle: the square it covers, in world units.</summary>
 public readonly record struct HandleMark(ResizeHandle Handle, Bounds Square);
+
+/// <summary>
+/// The text or note being edited in place. <see cref="Box"/> is in screen pixels, so the overlay sits over the layer at the
+/// current zoom. <see cref="Ink"/> is the text colour and <see cref="Fill"/> the note's background.
+/// </summary>
+public sealed record TextEdit(Guid Id, bool Multiline, Bounds Box, string Text, Rgb Fill, Rgb Ink, double FontPixels);
 
 /// <summary>
 /// Everything the surface draws in one render. <see cref="BoardEditor.Frame"/> builds it, so the markup reads values and
@@ -45,12 +55,15 @@ public sealed record CanvasFrame(
     Bounds? SelectionBounds,
     IReadOnlyList<HandleMark> Handles,
     Bounds? Net,
-    string? Notice);
+    string? Notice,
+    TextEdit? Editing = null,
+    bool CanUndo = false,
+    bool CanRedo = false);
 
 /// <summary>
-/// The board's interaction rules: which tool is active, what is selected, and what each pointer gesture does. It holds no
+/// The board's interaction rules: which tool is active, what is selected, and what each gesture, key and command does. It holds no
 /// geometry of its own; hit-testing, net selection, resizing, translation, path simplification and undo all come from
-/// <see cref="MiroClone.Web.Canvas.Core"/>. Changes are committed through <see cref="ICanvasSession"/>, one undo step per gesture.
+/// <see cref="MiroClone.Web.Canvas.Core"/>. Changes are committed through <see cref="ICanvasSession"/>, one undo step per gesture or command.
 /// </summary>
 public sealed class BoardEditor
 {
@@ -62,9 +75,12 @@ public sealed class BoardEditor
     /// <summary>The zoom change per wheel pixel. A wheel notch of about 100 pixels zooms by about 16 percent.</summary>
     public const double ZoomPerPixel = 0.0015;
 
+    /// <summary>The text size of a text layer, in world units: the SVG default, which the inline editor matches.</summary>
+    public const double FontPixels = 16;
+
     public const string LimitNotice = "A board holds at most 100 layers.";
 
-    /// <summary>The fill of a new layer. The colour picker and palette arrive with WP11.</summary>
+    /// <summary>The fill of a new rectangle, ellipse or note.</summary>
     public static readonly Rgb DefaultFill = new(0xd9, 0xe2, 0xff);
 
     private readonly ICanvasSession _session;
@@ -82,6 +98,8 @@ public sealed class BoardEditor
     private Guid _draftId;
     private Layer? _draft;
     private string? _notice;
+    private Guid? _editing;
+    private string _editText = string.Empty;
 
     public BoardEditor(ICanvasSession session, Func<Guid>? newId = null)
     {
@@ -110,10 +128,38 @@ public sealed class BoardEditor
         }
     }
 
-    /// <summary>Delete and Backspace remove the selection; Escape cancels the gesture in progress and leaves nothing changed.</summary>
-    public void Key(string key)
+    /// <summary>
+    /// The keyboard (ADR 0033). While a text layer is being edited the overlay owns the keyboard, so this does nothing.
+    /// Delete and Backspace remove the selection; Escape cancels the gesture in progress; Enter edits the one selected text or note;
+    /// Ctrl+Z undoes, Ctrl+Shift+Z redoes, Ctrl+A selects all; V, T, N, R, E and P choose a tool.
+    /// </summary>
+    public void Key(KeyInput input)
     {
-        switch (key)
+        ArgumentNullException.ThrowIfNull(input);
+        if (_editing is not null)
+        {
+            return;
+        }
+
+        if (input.Ctrl)
+        {
+            switch (input.Key)
+            {
+                case "z" or "Z" when input.Shift:
+                    Redo();
+                    break;
+                case "z" or "Z":
+                    Undo();
+                    break;
+                case "a" or "A":
+                    SelectAll();
+                    break;
+            }
+
+            return;
+        }
+
+        switch (input.Key)
         {
             case "Delete" or "Backspace":
                 DeleteSelection();
@@ -121,11 +167,33 @@ public sealed class BoardEditor
             case "Escape":
                 Cancel();
                 break;
+            case "Enter":
+                EditSelected();
+                break;
+            case "v" or "V":
+                SelectTool(CanvasTool.Select);
+                break;
+            case "t" or "T":
+                SelectTool(CanvasTool.Text);
+                break;
+            case "n" or "N":
+                SelectTool(CanvasTool.Note);
+                break;
+            case "r" or "R":
+                SelectTool(CanvasTool.Rectangle);
+                break;
+            case "e" or "E":
+                SelectTool(CanvasTool.Ellipse);
+                break;
+            case "p" or "P":
+                SelectTool(CanvasTool.Pencil);
+                break;
         }
     }
 
     public void SelectTool(CanvasTool tool)
     {
+        FinishEdit();
         Cancel();
         Tool = tool;
     }
@@ -133,6 +201,7 @@ public sealed class BoardEditor
     /// <summary>Removes the selected layers as one undo step.</summary>
     public void DeleteSelection()
     {
+        FinishEdit();
         Cancel();
         var ids = _selection.Where(_session.Document.Contains).ToArray();
         if (ids.Length == 0)
@@ -144,8 +213,119 @@ public sealed class BoardEditor
         _selection.Clear();
     }
 
-    /// <summary>Drops selected layers that a remote change removed, so the selection never names a layer that is not on the board.</summary>
-    public void Reconcile() => _selection.RemoveAll(id => !_session.Document.Contains(id));
+    /// <summary>Drops selected layers that a remote change removed, so the selection never names a layer that is not on the board (WP10).</summary>
+    public void Reconcile() => PruneSelection();
+
+    /// <summary>Selects every layer on the board.</summary>
+    public void SelectAll()
+    {
+        FinishEdit();
+        Cancel();
+        _selection.Clear();
+        _selection.AddRange(_session.Document.Order);
+    }
+
+    /// <summary>Moves the selected layers above every other layer, keeping their order among themselves. One undo step.</summary>
+    public void BringToFront() => Reorder(LayerOrdering.BringToFront);
+
+    /// <summary>Moves the selected layers below every other layer, keeping their order among themselves. One undo step.</summary>
+    public void SendToBack() => Reorder(LayerOrdering.SendToBack);
+
+    /// <summary>Gives every selected layer the colour, as one undo step. A layer already that colour is left out.</summary>
+    public void SetFill(Rgb fill)
+    {
+        FinishEdit();
+        Cancel();
+        var changed = new List<LayerMutation>();
+        foreach (var id in _selection)
+        {
+            if (_session.Document.TryGet(id, out var layer) && layer.Fill != fill)
+            {
+                changed.Add(LayerMutation.Upsert(layer with { Fill = fill }));
+            }
+        }
+
+        if (changed.Count > 0)
+        {
+            _session.Commit(changed);
+        }
+    }
+
+    /// <summary>Reverses the last step. The selection keeps only the layers that still exist.</summary>
+    public void Undo()
+    {
+        FinishEdit();
+        Cancel();
+        _session.Undo();
+        PruneSelection();
+    }
+
+    /// <summary>Replays the last undone step.</summary>
+    public void Redo()
+    {
+        FinishEdit();
+        Cancel();
+        _session.Redo();
+        PruneSelection();
+    }
+
+    /// <summary>Opens a text or note layer for editing in place. Other layer types cannot be edited in place.</summary>
+    public void BeginEdit(Guid id)
+    {
+        FinishEdit();
+        Cancel();
+        if (!_session.Document.TryGet(id, out var layer) || !IsText(layer))
+        {
+            return;
+        }
+
+        _selection.Clear();
+        _selection.Add(id);
+        _editing = id;
+        _editText = layer.Value ?? string.Empty;
+    }
+
+    /// <summary>Replaces the text being edited. Each keystroke calls this; nothing is committed until <see cref="FinishEdit"/>.</summary>
+    public void EditText(string text)
+    {
+        if (_editing is not null)
+        {
+            _editText = text;
+        }
+    }
+
+    /// <summary>
+    /// Ends the edit and commits the text as one undo step. Empty text removes the layer, so a click with the text tool that types
+    /// nothing leaves nothing behind. Does nothing when no edit is open.
+    /// </summary>
+    public void FinishEdit()
+    {
+        if (_editing is not { } id)
+        {
+            return;
+        }
+
+        var text = _editText;
+        _editing = null;
+        _editText = string.Empty;
+
+        if (!_session.Document.TryGet(id, out var layer))
+        {
+            return;
+        }
+
+        if (text.Length == 0)
+        {
+            _session.Commit([LayerMutation.Delete(id)]);
+            _selection.Remove(id);
+            return;
+        }
+
+        if ((layer.Value ?? string.Empty) != text)
+        {
+            _session.Commit([LayerMutation.Upsert(layer with { Value = text })]);
+        }
+    }
 
     /// <summary>Drops the gesture in progress without committing it. A drag returns to where it started.</summary>
     public void Cancel()
@@ -159,7 +339,17 @@ public sealed class BoardEditor
     }
 
     public CanvasFrame Frame() =>
-        new(Camera, Layers().ToArray(), _selection.ToArray(), SelectionBounds(), Handles(), Net(), _notice);
+        new(
+            Camera,
+            Layers().ToArray(),
+            _selection.ToArray(),
+            SelectionBounds(),
+            Handles(),
+            Net(),
+            _notice,
+            EditView(),
+            _session.CanUndo,
+            _session.CanRedo);
 
     private void ApplyPointer(PointerInput input)
     {
@@ -194,6 +384,7 @@ public sealed class BoardEditor
 
     private void Press(Point screen, bool additive)
     {
+        FinishEdit();
         Cancel();
         _notice = null;
         _pointer = _origin = Camera.ScreenToWorld(screen);
@@ -220,7 +411,7 @@ public sealed class BoardEditor
 
         _gesture = Gesture.Draw;
         _drawType = ToLayerType(Tool);
-        _draft = LayerFactory.Create(_draftId, _drawType, _origin, _origin, DefaultFill);
+        _draft = LayerFactory.Create(_draftId, _drawType, _origin, _origin, FillFor(Tool));
     }
 
     private void PressSelect(Point world, bool additive)
@@ -281,7 +472,7 @@ public sealed class BoardEditor
                 SelectNet();
                 break;
             case Gesture.Draw:
-                _draft = LayerFactory.Create(_draftId, _drawType, _origin, _pointer, DefaultFill);
+                _draft = LayerFactory.Create(_draftId, _drawType, _origin, _pointer, FillFor(Tool));
                 break;
             case Gesture.Pencil:
                 ExtendStroke();
@@ -302,7 +493,7 @@ public sealed class BoardEditor
                 Insert(draft);
                 break;
             case Gesture.Pencil when _points.Count >= 2:
-                Insert(LayerFactory.Path(_draftId, PathSimplifier.Simplify(_points, PencilStepPixels / Camera.Zoom), DefaultFill));
+                Insert(LayerFactory.Path(_draftId, PathSimplifier.Simplify(_points, PencilStepPixels / Camera.Zoom), FillFor(CanvasTool.Pencil)));
                 break;
         }
 
@@ -351,7 +542,7 @@ public sealed class BoardEditor
         }
 
         _points.Add(_pointer);
-        _draft = _points.Count >= 2 ? LayerFactory.Path(_draftId, _points, DefaultFill) : null;
+        _draft = _points.Count >= 2 ? LayerFactory.Path(_draftId, _points, FillFor(CanvasTool.Pencil)) : null;
     }
 
     private void CommitPreview()
@@ -377,7 +568,35 @@ public sealed class BoardEditor
 
         _session.Commit([LayerMutation.Upsert(layer)]);
         Tool = CanvasTool.Select;
+        if (IsText(layer))
+        {
+            BeginEdit(layer.Id);
+        }
     }
+
+    private void Reorder(Func<IReadOnlyList<Guid>, IEnumerable<Guid>, IReadOnlyList<Guid>> arrange)
+    {
+        FinishEdit();
+        Cancel();
+        var selected = _selection.Where(_session.Document.Contains).ToArray();
+        if (selected.Length == 0)
+        {
+            return;
+        }
+
+        _session.Commit([LayerMutation.Reorder(arrange(_session.Document.Order, selected))]);
+    }
+
+    /// <summary>Enter opens the one selected text or note. Anything else does nothing.</summary>
+    private void EditSelected()
+    {
+        if (_selection is [var only] && _session.Document.TryGet(only, out var layer) && IsText(layer))
+        {
+            BeginEdit(only);
+        }
+    }
+
+    private void PruneSelection() => _selection.RemoveAll(id => !_session.Document.Contains(id));
 
     private IEnumerable<Layer> Layers()
     {
@@ -421,10 +640,30 @@ public sealed class BoardEditor
 
     private Bounds? Net() => _gesture == Gesture.Net ? Marquee.Net(_origin, _pointer) : null;
 
+    /// <summary>The overlay for the text being edited, placed over the layer at the current zoom.</summary>
+    private TextEdit? EditView()
+    {
+        if (_editing is not { } id || !_session.Document.TryGet(id, out var layer))
+        {
+            return null;
+        }
+
+        var at = Camera.WorldToScreen(new Point(layer.X, layer.Y));
+        var box = new Bounds(at.X, at.Y, layer.Width * Camera.Zoom, layer.Height * Camera.Zoom);
+        var note = layer.Type == LayerType.Note;
+        var ink = note ? Palette.ReadableOn(layer.Fill) : layer.Fill;
+        return new TextEdit(id, note, box, _editText, layer.Fill, ink, FontPixels * Camera.Zoom);
+    }
+
     private double HandleSize => HandlePixels / Camera.Zoom;
 
     private Layer Original(Guid id) =>
         _session.Document.TryGet(id, out var layer) ? layer : throw new InvalidOperationException($"Layer {id} is not on the board.");
+
+    private static bool IsText(Layer layer) => layer.Type is LayerType.Text or LayerType.Note;
+
+    /// <summary>Text and pencil strokes default to ink, so they read on the white surface; shapes and notes take the shape default.</summary>
+    private static Rgb FillFor(CanvasTool tool) => tool is CanvasTool.Text or CanvasTool.Pencil ? Palette.Ink : DefaultFill;
 
     private static LayerType ToLayerType(CanvasTool tool) => tool switch
     {

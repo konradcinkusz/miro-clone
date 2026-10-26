@@ -140,22 +140,50 @@ public sealed partial class HubCanvasSession : IRealtimeCanvasSession, ICanvasHu
 
     public event Action? Changed;
 
+    public bool CanUndo
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _history.CanUndo;
+            }
+        }
+    }
+
+    public bool CanRedo
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _history.CanRedo;
+            }
+        }
+    }
+
     public IReadOnlyList<LayerMutation> Commit(IReadOnlyList<LayerMutation> mutations)
     {
         lock (_gate)
         {
-            var applied = _history.Execute(_document, mutations);
-            foreach (var mutation in applied)
-            {
-                _outbox.Enqueue(mutation);
-            }
+            return Send(_history.Execute(_document, mutations));
+        }
+    }
 
-            if (applied.Count > 0)
-            {
-                _outboxSignal.Writer.TryWrite(true);
-            }
+    /// <summary>An undo is a change to the room too: the mutations it made are sent, so the other participants see it.</summary>
+    public IReadOnlyList<LayerMutation> Undo()
+    {
+        lock (_gate)
+        {
+            return Send(_history.Undo(_document));
+        }
+    }
 
-            return applied;
+    public IReadOnlyList<LayerMutation> Redo()
+    {
+        lock (_gate)
+        {
+            return Send(_history.Redo(_document));
         }
     }
 
@@ -189,9 +217,9 @@ public sealed partial class HubCanvasSession : IRealtimeCanvasSession, ICanvasHu
             var token = _lifetime.Token;
             _loops =
             [
-                Task.Run(() => RunConnectionsAsync(token), CancellationToken.None),
-                Task.Run(() => PumpOutboxAsync(token), CancellationToken.None),
-                Task.Run(() => PumpPresenceAsync(token), CancellationToken.None),
+                Task.Run(() => Supervise(RunConnectionsAsync, token), CancellationToken.None),
+                Task.Run(() => Supervise(PumpOutboxAsync, token), CancellationToken.None),
+                Task.Run(() => Supervise(PumpPresenceAsync, token), CancellationToken.None),
             ];
         }
     }
@@ -212,15 +240,7 @@ public sealed partial class HubCanvasSession : IRealtimeCanvasSession, ICanvasHu
 
         // The loops own the connection: each one disposes it when it ends, so nothing is left open after this returns.
         await _lifetime.CancelAsync();
-        try
-        {
-            await Task.WhenAll(loops);
-        }
-        catch (OperationCanceledException)
-        {
-            // Every loop ends on cancellation; the cancelled tasks are the expected outcome here.
-        }
-
+        await Task.WhenAll(loops);
         _lifetime.Dispose();
     }
 
@@ -310,27 +330,36 @@ public sealed partial class HubCanvasSession : IRealtimeCanvasSession, ICanvasHu
         Notify();
     });
 
+    /// <summary>Queues the mutations that changed the document, for the room, in order. Called with the gate held.</summary>
+    private IReadOnlyList<LayerMutation> Send(IReadOnlyList<LayerMutation> applied)
+    {
+        foreach (var mutation in applied)
+        {
+            _outbox.Enqueue(mutation);
+        }
+
+        if (applied.Count > 0)
+        {
+            _outboxSignal.Writer.TryWrite(true);
+        }
+
+        return applied;
+    }
+
     private async Task RunConnectionsAsync(CancellationToken ct)
     {
         var delay = _retryDelay;
-        try
+        while (true)
         {
-            while (true)
+            var outcome = await ConnectOnceAsync(ct);
+            if (outcome == Outcome.Stopped)
             {
-                var outcome = await ConnectOnceAsync(ct);
-                if (outcome == Outcome.Stopped)
-                {
-                    return;
-                }
-
-                SetState(CanvasConnectionState.Reconnecting);
-                await Task.Delay(delay, _clock, ct);
-                delay = outcome == Outcome.Ended ? _retryDelay : TimeSpan.FromTicks(Math.Min(delay.Ticks * 2, MaximumRetryDelay.Ticks));
+                return;
             }
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            // Disposed. The connection has already been closed by ConnectOnceAsync.
+
+            SetState(CanvasConnectionState.Reconnecting);
+            await Task.Delay(delay, _clock, ct);
+            delay = outcome == Outcome.Ended ? _retryDelay : TimeSpan.FromTicks(Math.Min(delay.Ticks * 2, MaximumRetryDelay.Ticks));
         }
     }
 
@@ -404,17 +433,10 @@ public sealed partial class HubCanvasSession : IRealtimeCanvasSession, ICanvasHu
 
     private async Task PumpOutboxAsync(CancellationToken ct)
     {
-        try
+        while (true)
         {
-            while (true)
-            {
-                await _outboxSignal.Reader.ReadAsync(ct);
-                await DrainOutboxAsync(ct);
-            }
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            // Disposed.
+            await _outboxSignal.Reader.ReadAsync(ct);
+            await DrainOutboxAsync(ct);
         }
     }
 
@@ -494,20 +516,13 @@ public sealed partial class HubCanvasSession : IRealtimeCanvasSession, ICanvasHu
 
     private async Task PumpPresenceAsync(CancellationToken ct)
     {
-        try
+        while (true)
         {
-            while (true)
-            {
-                await _presenceSignal.Reader.ReadAsync(ct);
+            await _presenceSignal.Reader.ReadAsync(ct);
 
-                // The pace is the throttle: after a send, the next one waits at least PresencePace.
-                await Task.Delay(PresencePace, _clock, ct);
-                await SendPresenceAsync(ct);
-            }
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            // Disposed.
+            // The pace is the throttle: after a send, the next one waits at least PresencePace.
+            await Task.Delay(PresencePace, _clock, ct);
+            await SendPresenceAsync(ct);
         }
     }
 
@@ -541,6 +556,25 @@ public sealed partial class HubCanvasSession : IRealtimeCanvasSession, ICanvasHu
         {
             // A refused or failed presence update is not an edit. The next change sends the latest state, and a reconnect re-sends it.
             LogPresenceNotSent(_logger, exception.Message);
+        }
+    }
+
+    /// <summary>
+    /// Runs one background loop. Ending by cancellation is the normal end, and an error during disposal is the shutdown's to
+    /// absorb, so the loop never faults and disposal never throws. Any other failure is logged.
+    /// </summary>
+    private async Task Supervise(Func<CancellationToken, Task> loop, CancellationToken ct)
+    {
+        try
+        {
+            await loop(ct);
+        }
+        catch (Exception exception)
+        {
+            if (!ct.IsCancellationRequested)
+            {
+                LogLoopFailed(_logger, exception);
+            }
         }
     }
 
@@ -658,6 +692,9 @@ public sealed partial class HubCanvasSession : IRealtimeCanvasSession, ICanvasHu
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "A presence update was not sent; the next change sends the latest state: {Error}")]
     private static partial void LogPresenceNotSent(ILogger logger, string error);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "A canvas session background loop failed.")]
+    private static partial void LogLoopFailed(ILogger logger, Exception exception);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "A canvas session update failed.")]
     private static partial void LogDispatchFailed(ILogger logger, Exception exception);

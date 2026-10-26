@@ -19,3 +19,11 @@
     justify-content: flex-end;
     margin-top: var(--space-4);
 }
+
+.dialog-sentinel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    opacity: 0;
+}
