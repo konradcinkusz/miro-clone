@@ -172,7 +172,7 @@ sequenceDiagram
 ```
 
 A purge that fails leaves an orphan snapshot. No code removes orphans yet: the log message says "left for the sweep" and
-ADR 0013 describes a sweep, but no sweep exists in the repository (see [`COMPLIANCE.md`](architecture/COMPLIANCE.md#open-register)).
+ADR 0013 describes a sweep, but no sweep exists in the repository (see [`COMPLIANCE.md`](architecture/COMPLIANCE.md#3a-open-register)).
 
 ## 4. Persistence and data ownership
 
@@ -208,7 +208,7 @@ per flush. A Web restart ends every session and every open circuit.
 | Process and records | 0038 |
 
 ADR file numbers are the reference. ADR 0011 exists twice (authservice adoption; canvas core), and some ADR headings show
-another number. [`COMPLIANCE.md`](architecture/COMPLIANCE.md#open-register) lists them.
+another number. [`COMPLIANCE.md`](architecture/COMPLIANCE.md#3a-open-register) lists them.
 
 ## 6. Components inside the Web app
 

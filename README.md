@@ -137,7 +137,7 @@ only when `TEST_POSTGRES` names a reachable server. They are skipped otherwise. 
 
 Architecture decision records live in [`docs/decisions/`](docs/decisions/). The file name is the number. Two files carry the
 number 0011, and some headings disagree with their file names; the file name is the reference (see the register in
-[`COMPLIANCE.md`](docs/architecture/COMPLIANCE.md#open-register)).
+[`COMPLIANCE.md`](docs/architecture/COMPLIANCE.md#3a-open-register)).
 
 | ADR | Topic |
 |---|---|
