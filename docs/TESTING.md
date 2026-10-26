@@ -33,8 +33,9 @@ The counts are test methods declared with `[Fact]` or `[Theory]`, not executed c
 | `MiroClone.Web.Tests` | 320 | Canvas Core rules and their isolation from Blazor types, the editor, the live session with a fake transport, two sessions converging on the real canvas hub on `TestServer`, pages in bUnit, account flows, session single-flight refresh, the stylesheet and cover contract, host pins, Data Protection keys | None; no browser |
 | `MiroClone.TestSupport` | 0 | A local authority stand-in and token factory, shared by the tests | None |
 
-Totals: about 466 methods. CI on PR #15 reported 562 tests run, 557 passed, 5 skipped, 0 failed (the skips are the
-PostgreSQL-gated tests). PR #13 reported a clean build and 507 passed before WP10.
+Totals: about 466 methods. The PR #15 body reports a local run of 562 tests: 557 passed, 5 skipped, 0 failed (the skips are the
+PostgreSQL-gated tests). CI passed on the same commit, but its test log was not read for this page. The PR #13 body reports
+512 tests, 507 passed, 5 skipped before WP10.
 
 ### What the architecture tests enforce
 
