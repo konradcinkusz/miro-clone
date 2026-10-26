@@ -186,6 +186,8 @@ number 0011, and some headings disagree with their file names; the file name is 
 | [0043](docs/decisions/0043-canvas-purge-requires-the-board-to-be-deleted.md) | A canvas purge needs the board to be deleted (amends 0016) |
 | [0044](docs/decisions/0044-orphan-canvas-snapshots-are-not-swept.md) | Orphan canvas snapshots are not swept |
 | [0045](docs/decisions/0045-the-auth-rate-limit-covers-the-account-forms-and-not-sign-out.md) | Auth rate limit on the account forms; sign-out exempt |
+| [0046](docs/decisions/0046-the-live-outbox-is-capped-and-refuses-new-edits-with-a-notice.md) | The live outbox holds at most 1,000 edits; new ones are refused with a notice (amends 0035) |
+| [0047](docs/decisions/0047-security-headers-form-body-limit-and-token-redaction-in-telemetry.md) | Security headers, an account form body limit, no token in exported spans |
 
 ## Licence
 
