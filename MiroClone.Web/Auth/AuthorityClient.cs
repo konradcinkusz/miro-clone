@@ -142,6 +142,16 @@ public sealed class AuthorityClient(HttpClient http)
         return AuthorityResult.Success<IReadOnlyList<AuthorityOrganization>>(organizations);
     }
 
+    /// <summary>
+    /// Sends an invitation to join an organization as a member. authservice sends the email and answers 400 when an invitation is
+    /// already out; that message is shown as given. The invitation itself is not returned to the page.
+    /// </summary>
+    public async Task<AuthorityResult<bool>> InviteMemberAsync(string sessionId, Guid organizationId, string email, CancellationToken ct = default)
+    {
+        var reply = await SendAsync(HttpMethod.Post, $"api/v1/organizations/{organizationId:D}/invite", new { email, role = "Member" }, sessionId, ct);
+        return reply.Succeeded ? AuthorityResult.Success(true) : reply.Failure<bool>();
+    }
+
     /// <summary>Confirms an address with the token from the verification email.</summary>
     public Task<AuthorityResult<bool>> VerifyEmailAsync(string email, string token, CancellationToken ct = default) =>
         SendUnitAsync(HttpMethod.Post, "api/v1/auth/verify-email", new { email, token }, ct);

@@ -1,0 +1,33 @@
+@* The dashboard's left column: the workspace in words, and the two views. The workspace is read-only (ADR 0024). *@
+<aside class="dashboard-sidebar" aria-label="Dashboard">
+    <section class="sidebar-section" aria-labelledby="workspace-heading">
+        <h2 id="workspace-heading">Workspace</h2>
+        @if (WorkspaceName is { } name)
+        {
+            <p class="muted" data-testid="workspace-name">Workspace: @name</p>
+        }
+        else
+        {
+            <p class="muted" data-testid="workspace-none-name">No active workspace.</p>
+        }
+    </section>
+
+    <nav class="sidebar-section" aria-label="Board views">
+        <ul class="plain-list sidebar-links">
+            <li>
+                <a href="@BoardQuery.Url(null, false, 1)" aria-current="@(Favourites ? null : "page")" data-testid="nav-team-boards">Team boards</a>
+            </li>
+            <li>
+                <a href="@BoardQuery.Url(null, true, 1)" aria-current="@(Favourites ? "page" : null)" data-testid="nav-favourite-boards">Favourite boards</a>
+            </li>
+        </ul>
+    </nav>
+</aside>
+
+@code {
+    [Parameter]
+    public string? WorkspaceName { get; set; }
+
+    [Parameter]
+    public bool Favourites { get; set; }
+}

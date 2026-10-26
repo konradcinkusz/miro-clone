@@ -1,0 +1,104 @@
+@using MiroClone.Web.Api
+@inject TimeProvider Clock
+@inject NavigationManager Navigation
+
+@* One board in the grid. It reports what the user asked for; the page changes the card only after the service has agreed. *@
+<article class="board-card" data-testid="board-card">
+    <img class="board-card-image" src="@BoardImage.PathFor(Board.ImageSeed)" alt="" width="100" height="127" loading="lazy" />
+
+    <div class="board-card-body">
+        <h3 class="board-card-title"><a href="@BoardPath">@Board.Title</a></h3>
+        <p class="muted board-card-meta">@AuthorLabel, @RelativeTime.Describe(Board.CreatedAt, Clock.GetUtcNow())</p>
+    </div>
+
+    <div class="board-card-actions cluster">
+        <button type="button" class="btn btn-quiet" aria-pressed="@(Board.IsFavourite ? "true" : "false")"
+                aria-label="Favourite @Board.Title" disabled="@Busy" data-testid="favourite-toggle"
+                @onclick="() => OnFavourite.InvokeAsync(Board)">
+            <span aria-hidden="true">@(Board.IsFavourite ? "★" : "☆")</span>
+        </button>
+        <button type="button" class="btn btn-quiet" aria-haspopup="menu" aria-expanded="@(_menuOpen ? "true" : "false")"
+                aria-controls="@_menuId" aria-label="Actions for @Board.Title" data-testid="board-actions" @onclick="ToggleMenu">
+            <span aria-hidden="true">⋯</span>
+        </button>
+    </div>
+
+    @if (_menuOpen)
+    {
+        <ul class="board-menu" id="@_menuId" role="menu" aria-label="Actions for @Board.Title" data-testid="board-menu">
+            <li role="none">
+                <button type="button" role="menuitem" class="btn btn-quiet" data-testid="board-link-action" @onclick="ShowLink">Board link</button>
+            </li>
+            <li role="none">
+                <button type="button" role="menuitem" class="btn btn-quiet" data-testid="board-rename" @onclick="Rename">Rename</button>
+            </li>
+            <li role="none">
+                <button type="button" role="menuitem" class="btn btn-quiet" data-testid="board-delete" @onclick="Delete">Delete</button>
+            </li>
+        </ul>
+    }
+
+    @if (_showLink)
+    {
+        <div class="field board-link">
+            <label for="@_linkId">Board link (select and copy)</label>
+            <input id="@_linkId" type="text" readonly value="@AbsoluteLink" data-testid="board-link" />
+        </div>
+    }
+</article>
+
+@code {
+    private readonly string _menuId = $"board-menu-{Guid.NewGuid():N}";
+    private readonly string _linkId = $"board-link-{Guid.NewGuid():N}";
+    private bool _menuOpen;
+    private bool _showLink;
+
+    [Parameter, EditorRequired]
+    public BoardSummaryDto Board { get; set; } = null!;
+
+    [Parameter]
+    public Guid? CurrentUserId { get; set; }
+
+    [Parameter]
+    public bool Busy { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback<BoardSummaryDto> OnFavourite { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback<BoardSummaryDto> OnRename { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback<BoardSummaryDto> OnDelete { get; set; }
+
+    private string BoardPath => $"/board/{Board.Id.ToString("D")}";
+
+    private string AbsoluteLink => Navigation.ToAbsoluteUri(BoardPath).ToString();
+
+    // "You" only when the signed-in user wrote the board; the name otherwise, as the list shows it.
+    private string AuthorLabel => CurrentUserId == Board.AuthorId ? "You" : Board.AuthorName;
+
+    private void ToggleMenu()
+    {
+        _menuOpen = !_menuOpen;
+        _showLink = false;
+    }
+
+    private void ShowLink()
+    {
+        _showLink = true;
+        _menuOpen = false;
+    }
+
+    private Task Rename()
+    {
+        _menuOpen = false;
+        return OnRename.InvokeAsync(Board);
+    }
+
+    private Task Delete()
+    {
+        _menuOpen = false;
+        return OnDelete.InvokeAsync(Board);
+    }
+}
