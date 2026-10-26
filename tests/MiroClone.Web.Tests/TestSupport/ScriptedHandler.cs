@@ -33,8 +33,16 @@ internal sealed class ScriptedHandler : HttpMessageHandler
 
     public int CountCalls(string method, string path) => Calls.Count(call => call.Method == method && call.Path == path);
 
+    /// <summary>When set, every request fails at the connection, as it does when the service is down.</summary>
+    public bool Offline { get; set; }
+
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
+        if (Offline)
+        {
+            throw new HttpRequestException("Connection refused (scripted offline).");
+        }
+
         var path = request.RequestUri!.AbsolutePath.Trim('/');
         var body = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
         Calls.Add(new Call(request.Method.Method, path, request.Headers.Authorization?.ToString(), body));
