@@ -1,0 +1,17 @@
+@using MiroClone.Web.Canvas.Realtime
+
+<ul class="board-participants" aria-label="Participants">
+    @foreach (var person in Participants)
+    {
+        <li class="avatar" style="--avatar-colour: @person.Color" title="@Title(person)"
+            data-testid="@(person.IsSelf ? "participant-self" : "participant")">@person.Initial</li>
+    }
+</ul>
+
+@code {
+    /// <summary>Everyone on the board, the signed-in user first, each user once.</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<ParticipantView> Participants { get; set; } = [];
+
+    private static string Title(ParticipantView person) => person.IsSelf ? "You" : person.Name;
+}

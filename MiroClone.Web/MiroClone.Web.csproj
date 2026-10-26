@@ -13,4 +13,9 @@
     <ProjectReference Include="..\MiroClone.ServiceDefaults\MiroClone.ServiceDefaults.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The circuit's client for the canvas hub (WP10, ADR 0033). Version in Directory.Packages.props. -->
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
+  </ItemGroup>
+
 </Project>

@@ -1,0 +1,31 @@
+@using MiroClone.Web.Canvas.Core
+@using MiroClone.Web.Canvas.Realtime
+
+@foreach (var remote in Remote)
+{
+    @foreach (var box in remote.Selection)
+    {
+        <rect class="board-remote-selection" data-testid="remote-selection" stroke="@remote.Color"
+              x="@SvgFormat.Num(box.X)" y="@SvgFormat.Num(box.Y)" width="@SvgFormat.Num(box.Width)" height="@SvgFormat.Num(box.Height)" />
+    }
+    @if (remote.Cursor is { } cursor)
+    {
+        <g class="board-cursor" data-testid="remote-cursor" transform="@Placement(cursor)">
+            <path d="M0 0 L0 16 L4.5 12 L7.5 18.5 L10 17.5 L7 11.5 L12.5 11.5 Z" fill="@remote.Color" />
+            <text class="board-cursor-name" x="14" y="18" fill="@remote.Color">@remote.Name</text>
+        </g>
+    }
+}
+
+@code {
+    /// <summary>What the other participants are doing. The page passes only other people; the signed-in user is never drawn here.</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<RemoteParticipant> Remote { get; set; } = [];
+
+    /// <summary>The camera zoom. A cursor is drawn at a fixed size on screen, so it scales against the zoom.</summary>
+    [Parameter]
+    public double Zoom { get; set; } = 1;
+
+    private string Placement(Point cursor) =>
+        $"translate({SvgFormat.Num(cursor.X)} {SvgFormat.Num(cursor.Y)}) scale({SvgFormat.Num(1 / Math.Max(Zoom, 0.01))})";
+}

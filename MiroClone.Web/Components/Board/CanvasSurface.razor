@@ -2,6 +2,7 @@
 @using Microsoft.AspNetCore.Components.Web
 @using MiroClone.Web.Canvas.Interaction
 @using MiroClone.Web.Canvas.Interop
+@using MiroClone.Web.Canvas.Realtime
 @implements IAsyncDisposable
 @inject ICanvasPointerSource Pointer
 
@@ -12,6 +13,7 @@
         {
             <LayerPreview Layer="layer" />
         }
+        <CursorsPresence Remote="Remote" Zoom="Frame.Camera.Zoom" />
         @if (Frame.Net is { } net)
         {
             <rect class="board-net" data-testid="selection-net"
@@ -42,6 +44,10 @@
     /// <summary>Pointer and wheel input, already in screen pixels relative to the surface.</summary>
     [Parameter, EditorRequired]
     public EventCallback<CanvasInput> OnInput { get; set; }
+
+    /// <summary>The other participants' cursors and selections, in world coordinates (WP10).</summary>
+    [Parameter]
+    public IReadOnlyList<RemoteParticipant> Remote { get; set; } = [];
 
     /// <summary>A key press while the surface has focus.</summary>
     [Parameter, EditorRequired]

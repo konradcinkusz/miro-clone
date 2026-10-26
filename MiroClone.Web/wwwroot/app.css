@@ -342,7 +342,7 @@ a:hover {
     width: 2rem;
     height: 2rem;
     border-radius: 999px;
-    background: var(--color-accent);
+    background: var(--avatar-colour, var(--color-accent));
     color: var(--color-accent-contrast);
     font-size: var(--font-size-small);
     font-weight: 600;
@@ -408,6 +408,33 @@ a:hover {
 
 .board-net {
     fill: var(--color-accent-soft);
+}
+
+/* Other participants (WP10). Their colours are data and arrive as attributes; the chrome around them is tokens. */
+.board-remote-selection {
+    fill: none;
+    stroke-width: 2;
+    stroke-dasharray: 4 3;
+    vector-effect: non-scaling-stroke;
+    pointer-events: none;
+}
+
+.board-cursor {
+    pointer-events: none;
+}
+
+.board-cursor path {
+    stroke: var(--color-surface);
+    stroke-width: 1;
+}
+
+.board-cursor-name {
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 600;
+    paint-order: stroke;
+    stroke: var(--color-surface);
+    stroke-width: 3px;
 }
 
 .board-handle {

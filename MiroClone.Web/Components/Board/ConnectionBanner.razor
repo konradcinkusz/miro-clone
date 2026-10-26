@@ -1,0 +1,23 @@
+@using MiroClone.Web.Canvas.Realtime
+
+@if (State != CanvasConnectionState.Live)
+{
+    <p class="callout @Tone" role="status" data-testid="connection-banner" data-state="@StateName">@Message</p>
+}
+
+@code {
+    /// <summary>The board's live connection. Nothing is shown while it is live.</summary>
+    [Parameter, EditorRequired]
+    public CanvasConnectionState State { get; set; }
+
+    private string Message => State switch
+    {
+        CanvasConnectionState.Connecting => "Connecting to live updates…",
+        CanvasConnectionState.Reconnecting => "Connection lost. Reconnecting; your edits stay on this screen and are sent when it returns.",
+        _ => "Live updates are unavailable for this board. Reload the page to try again.",
+    };
+
+    private string Tone => State == CanvasConnectionState.Connecting ? string.Empty : "callout-warning";
+
+    private string StateName => State.ToString().ToLowerInvariant();
+}

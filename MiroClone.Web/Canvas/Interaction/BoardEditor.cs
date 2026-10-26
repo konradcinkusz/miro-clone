@@ -144,6 +144,9 @@ public sealed class BoardEditor
         _selection.Clear();
     }
 
+    /// <summary>Drops selected layers that a remote change removed, so the selection never names a layer that is not on the board.</summary>
+    public void Reconcile() => _selection.RemoveAll(id => !_session.Document.Contains(id));
+
     /// <summary>Drops the gesture in progress without committing it. A drag returns to where it started.</summary>
     public void Cancel()
     {
