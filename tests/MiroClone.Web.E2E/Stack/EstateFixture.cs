@@ -170,10 +170,10 @@ public sealed class EstateFixture : IAsyncLifetime
         var webPort = FreePort();
         var authPort = FreePort();
         var project = Path.Combine(RepositoryRoot(), "MiroClone.AppHost", "MiroClone.AppHost.csproj");
-#if RELEASE
-        const string configuration = "Release";
-#else
+#if DEBUG
         const string configuration = "Debug";
+#else
+        const string configuration = "Release";
 #endif
 
         var start = new ProcessStartInfo("dotnet") { UseShellExecute = false };
