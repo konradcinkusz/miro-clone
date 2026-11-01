@@ -12,13 +12,43 @@ public sealed class CircuitWatch : IDisposable
 {
     private readonly object _gate = new();
     private readonly List<(int Target, TaskCompletionSource Done)> _waiters = [];
+    private readonly IPage _page;
+    private readonly List<string> _events = [];
     private int _ready;
     private bool _startSent;
 
     /// <summary>Subscribes before the first navigation, so no circuit is missed.</summary>
     public CircuitWatch(IPage page)
     {
+        _page = page;
         page.WebSocket += OnWebSocket;
+        // What the browser saw, kept so that a circuit that never becomes ready says why (console, failed requests, HTTP errors).
+        page.Console += (_, message) => Note($"console.{message.Type}: {message.Text}");
+        page.PageError += (_, error) => Note($"pageerror: {error}");
+        page.RequestFailed += (_, request) => Note($"request failed: {request.Method} {request.Url}: {request.Failure}");
+        page.Response += (_, response) =>
+        {
+            if (response.Status >= 400 || (response.Status >= 300 && response.Request.Method != "GET"))
+            {
+                Note($"response {response.Status}: {response.Request.Method} {response.Url} location={response.Headers.GetValueOrDefault("location")}");
+            }
+        };
+    }
+
+    private void Note(string line)
+    {
+        lock (_gate)
+        {
+            _events.Add($"{DateTime.UtcNow:HH:mm:ss.fff} {line}");
+        }
+    }
+
+    private string Describe()
+    {
+        lock (_gate)
+        {
+            return $"page {_page.Url}; ready={_ready}, startSent={_startSent}\n  " + string.Join("\n  ", _events.TakeLast(40));
+        }
     }
 
     /// <summary>How many circuits have become ready on this page so far.</summary>
@@ -48,11 +78,26 @@ public sealed class CircuitWatch : IDisposable
             _waiters.Add((target, done));
         }
 
-        return done.Task.WaitAsync(limit ?? TimeSpan.FromSeconds(30));
+        return WaitWithReportAsync(done.Task, limit ?? TimeSpan.FromSeconds(30));
+    }
+
+    private async Task WaitWithReportAsync(Task done, TimeSpan limit)
+    {
+        try
+        {
+            await done.WaitAsync(limit);
+        }
+        catch (TimeoutException)
+        {
+            throw new TimeoutException($"The Blazor circuit did not become ready within {limit.TotalSeconds:0}s. {Describe()}");
+        }
     }
 
     private void OnWebSocket(object? sender, IWebSocket socket)
     {
+        Note($"websocket opened: {socket.Url}");
+        socket.Close += (_, _) => Note($"websocket closed: {socket.Url}");
+        socket.SocketError += (_, error) => Note($"websocket error: {socket.Url}: {error}");
         if (!socket.Url.Contains("/_blazor", StringComparison.Ordinal))
         {
             return;
