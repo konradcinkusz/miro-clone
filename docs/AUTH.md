@@ -32,22 +32,25 @@ them (fail closed, ADR 0011). Choosing an active workspace needs an authservice 
 
 ## Running it in development
 
-1. Create a signing key outside the repository. Keep it out of git.
+1. **The signing key needs no step.** `scripts/run-apphost.sh` generates an RSA-2048 key on the first run and Aspire keeps it in the
+   AppHost's user secrets (`Parameters:authservice-jwt-private-key`); `scripts/compose-up.sh` and `scripts/run-local-stack.sh` write one to
+   `.local/` (gitignored). To use your own key, set the user secret:
 
    ```bash
    openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out ~/miroclone-jwt-dev.pem
    dotnet user-secrets set "Parameters:authservice-jwt-private-key" "$(cat ~/miroclone-jwt-dev.pem)" --project MiroClone.AppHost
    ```
 
-   The AppHost reads this parameter when it starts. Without it the authservice container cannot be configured, so the estate does not start.
+   Without any key authservice cannot be configured and every service that waits for it never starts: that was the first failure
+   of the first local run (ADR 0049). Never reuse this key outside development.
 
 2. Start the estate. It needs a Docker daemon for PostgreSQL and authservice.
 
    ```bash
-   scripts/run-local-stack.sh
+   scripts/run-apphost.sh      # Aspire; or scripts/compose-up.sh; or scripts/run-local-stack.sh
    ```
 
-   Open the Aspire dashboard and note the `authservice` endpoint, for example `http://localhost:<port>`.
+   The authservice endpoint is on the dashboard (AppHost), or <http://localhost:5080> (compose, run-local-stack).
 
 3. Seed two users in one organization (owner and member). The seed is safe to run again.
 

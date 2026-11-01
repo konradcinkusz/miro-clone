@@ -8,7 +8,7 @@ namespace MiroClone.AppHost;
 /// (<c>persist: true</c>). A developer therefore never has to create or paste a key (docs/AUTH.md, ADR 0049). The value is
 /// generated on the developer's machine and never written to the repository.
 /// </summary>
-internal sealed class GeneratedRsaKeyDefault : ParameterDefault
+public sealed class GeneratedRsaKeyDefault : ParameterDefault
 {
     public override string GetDefaultValue()
     {
