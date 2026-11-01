@@ -37,8 +37,10 @@ public static class EstateExtensions
         var canvasDatabase = postgres.AddDatabase("canvas");
         var authDatabase = postgres.AddDatabase("authservice-db", "authservice");
 
-        // Development only: the RS256 private key is an Aspire secret parameter, read from user secrets (Parameters:authservice-jwt-private-key).
-        var jwtPrivateKey = builder.AddParameter("authservice-jwt-private-key", secret: true);
+        // Development only: the RS256 private key is an Aspire secret parameter. The first run generates a key and Aspire keeps it in
+        // the AppHost's user secrets (Parameters:authservice-jwt-private-key), so no step is needed and nothing enters the tree (ADR 0049).
+        // A key already in user secrets or the environment is used as it is.
+        var jwtPrivateKey = builder.AddParameter("authservice-jwt-private-key", new GeneratedRsaKeyDefault(), secret: true, persist: true);
 
         var authService = builder
             .AddContainer("authservice", AuthServiceImage, AuthServiceTag)
