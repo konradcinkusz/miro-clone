@@ -52,7 +52,9 @@ public sealed partial class Journey : IAsyncDisposable
     /// <summary>Signs in through the account form and waits for the dashboard's circuit.</summary>
     public async Task SignInAsync(Account account)
     {
-        await GoToStaticAsync("/sign-in");
+        // The account pages are interactive-router pages (ADR 0042): the circuit takes over the form after the server render and
+        // replaces what was typed before it connected, so the helper waits for the circuit before it types.
+        await GoToInteractiveAsync("/sign-in");
         await FillFieldAsync("#sign-in-email", account.Email);
         await FillFieldAsync("#sign-in-password", account.Password);
         var ready = _circuit.ReadyCount;

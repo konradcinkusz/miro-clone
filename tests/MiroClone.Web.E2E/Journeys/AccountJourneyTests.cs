@@ -17,7 +17,7 @@ public sealed class AccountJourneyTests(EstateFixture stack) : JourneyTests(stac
         var account = Account.New("signup");
         await using var journey = await Journey.OpenAsync(Stack);
 
-        await journey.GoToStaticAsync("/sign-up");
+        await journey.GoToInteractiveAsync("/sign-up");
         await journey.FillFieldAsync("#sign-up-email", account.Email);
         await journey.FillFieldAsync("#sign-up-password", account.Password);
         await journey.Page.Locator("#sign-up-terms").CheckAsync();

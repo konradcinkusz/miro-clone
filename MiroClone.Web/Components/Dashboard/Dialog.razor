@@ -1,5 +1,6 @@
-@* A modal dialog shell: a labelled dialog that closes on Escape. Focus starts on the first control (its autofocus) and stays inside the
-   dialog while it is open: two sentinels at its edges send Tab and Shift+Tab back in (ADR 0034). No JavaScript: the framework focuses. *@
+@* A modal dialog shell: a labelled dialog that closes on Escape. Focus moves to the dialog when it opens (the next Tab reaches the first control)
+   and stays inside while it is open: two sentinels at its edges send Tab and Shift+Tab back in (ADR 0034). No JavaScript: the framework focuses.
+   The HTML autofocus attribute alone is not enough: a browser ignores it on an element inserted after the page has loaded (ADR 0049). *@
 <div class="dialog-backdrop">
     <span class="dialog-sentinel" tabindex="0" aria-hidden="true" @ref="_before" @onfocus="FocusEnd"></span>
     <div class="card dialog" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="@_titleId" data-testid="@TestId"
@@ -27,6 +28,14 @@
 
     [Parameter, EditorRequired]
     public EventCallback OnClose { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await _card.FocusAsync();
+        }
+    }
 
     private Task OnKeyDown(KeyboardEventArgs e) => e.Key == "Escape" ? OnClose.InvokeAsync() : Task.CompletedTask;
 
