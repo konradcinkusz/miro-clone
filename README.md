@@ -53,46 +53,50 @@ data each store holds are in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 - .NET SDK 10. The SDK is pinned in [`global.json`](global.json) (10.0.100, roll-forward to the latest feature band).
 - **Docker** running locally. The AppHost starts PostgreSQL and authservice as containers.
-- `openssl`, to create the development signing key ([`docs/AUTH.md`](docs/AUTH.md)).
 - Git hooks, recommended: `scripts/install-hooks.sh`, then [gitleaks](https://github.com/gitleaks/gitleaks#installing).
   The pre-commit hook refuses to commit without gitleaks.
 
 ## Run it locally
 
-1. Clone once and install the hooks:
+**Prerequisites:** the .NET 10 SDK (`dotnet --version` is 10.x), Docker running (`docker info` works), `openssl` and `git`.
+Docker pulls `postgres:18.3` from Docker Hub and `ghcr.io/konradcinkusz/authservice:v0.3.4` from GitHub, so both registries must be reachable.
+No secret has to be created: the authservice signing key is generated for you and kept outside the repository.
 
-   ```bash
-   scripts/install-hooks.sh
-   ```
+**Path 1, the Aspire AppHost (developer path), one command:**
 
-2. Create the RS256 development key outside the repository and store it as a user secret. The AppHost reads it at start-up.
-   The full steps are in [`docs/AUTH.md`](docs/AUTH.md#running-it-in-development).
+```bash
+scripts/install-hooks.sh        # once per clone: secret-scanning pre-commit hook
+scripts/run-apphost.sh          # = dotnet run --project MiroClone.AppHost --launch-profile http
+```
 
-   ```bash
-   openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out ~/miroclone-jwt-dev.pem
-   dotnet user-secrets set "Parameters:authservice-jwt-private-key" "$(cat ~/miroclone-jwt-dev.pem)" --project MiroClone.AppHost
-   ```
+- Aspire dashboard: <http://localhost:15170> (the login link with its token is printed in the terminal). It lists `postgres`, `authservice`,
+  `boards-service`, `canvas-service` and `web` with their logs; each service shows Running only after its `/health` answers.
+- The web app's URL is on the `web` row of the dashboard (Aspire assigns the port).
+- For https: `dotnet dev-certs https --trust` once, then `scripts/run-apphost.sh --launch-profile https` (dashboard <https://localhost:17170>).
+- First run: the AppHost generates an RSA signing key and stores it in its user secrets (`Parameters:authservice-jwt-private-key`).
+  To use your own, `dotnet user-secrets set "Parameters:authservice-jwt-private-key" "$(cat key.pem)" --project MiroClone.AppHost`.
 
-3. Start the estate through the Aspire AppHost. It starts PostgreSQL, authservice, the two services and the web app, and
-   opens the Aspire dashboard. The first run downloads the Aspire orchestration packages.
+**Path 2, docker compose (the same estate, all in containers, no .NET needed to run it):**
 
-   ```bash
-   scripts/run-local-stack.sh
-   ```
+```bash
+scripts/compose-up.sh           # builds the three images, starts everything, waits until healthy
+docker compose down -v          # stop and delete the data
+```
 
-4. Open the web app from the dashboard. Sign up at `/sign-up` for a new account. A new account has no workspace until an
-   organization exists in authservice, so for two users with a shared workspace run the seed script with the authservice
-   address from the dashboard:
+Web <http://localhost:8080>, authservice <http://localhost:5080>. This is the path CI runs the browser journeys against.
 
-   ```bash
-   scripts/seed-dev-users.sh http://localhost:<authservice-port>
-   ```
+**Path 3, no AppHost (fallback):** `scripts/run-local-stack.sh` starts PostgreSQL and authservice in Docker and the three services as plain
+processes; logs go to `.local/logs/`. Web <http://localhost:8080>.
 
-   The seed script creates `owner@dev.test` and `member@dev.test`. The member's invitation token is printed to the
-   authservice log on the first run; the script says where to find it. See [`docs/AUTH.md`](docs/AUTH.md).
+**Signing in.** Sign up at `/sign-up`. A new account has no workspace until an organization exists in authservice; for two users in one
+workspace run `scripts/seed-dev-users.sh http://localhost:5080` (compose and path 3) or with the authservice address from the dashboard.
+The member's invitation token is in the authservice log (`docker logs miroclone-authservice-1`). See [`docs/AUTH.md`](docs/AUTH.md).
 
-The development configuration is in `MiroClone.AppHost/EstateExtensions.cs`. It relaxes two settings that deployments do not
-(`Auth__RequireHttpsMetadata=false` and `ASPNETCORE_ENVIRONMENT=Development`, so authservice logs its dev outbox).
+**If it does not start,** read the logs first: the dashboard console for the AppHost, `docker compose logs <service>` for compose,
+`.local/logs/<service>.log` for path 3. The causes found so far are in [ADR 0049](docs/decisions/0049-local-start-and-containerized-end-to-end.md).
+
+The development configuration is in `MiroClone.AppHost/EstateExtensions.cs` and `compose.yaml`. It relaxes two settings that deployments do not
+(`Auth__RequireHttpsMetadata=false` and `ASPNETCORE_ENVIRONMENT=Development`, so cookies work over plain http and authservice logs its dev outbox).
 
 ## Build and test
 

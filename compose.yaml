@@ -1,0 +1,116 @@
+# The whole estate in containers, mirroring MiroClone.AppHost (EstateExtensions): the same databases, environment variables and
+# start order (depends_on + healthchecks stand in for WaitFor). This is the CI path of the containerized end-to-end job and a
+# second way to run the estate locally, because Aspire's DCP orchestrator does not run on GitHub runners (ADR 0049).
+# Development settings only: plain http on localhost, a throwaway database password, a signing key supplied by the caller.
+#
+#   scripts/compose-up.sh        # generates a signing key in .local/ (gitignored) and runs `docker compose up --build --wait`
+#
+# Web: http://localhost:8080   authservice: http://localhost:5080   boards: :5081   canvas: :5082   postgres: :5432 (loopback)
+name: miroclone
+
+x-authority: &authority
+  ASPNETCORE_ENVIRONMENT: Development
+  ASPNETCORE_URLS: http://+:8080
+  Auth__Authority: http://authservice:8080
+  Auth__Issuer: MiroClone
+  Auth__Audience: miro-clone
+  Auth__RequireHttpsMetadata: "false"
+
+# The aspnet images carry bash but not curl: a probe over /dev/tcp answers 0 only for a 200 status line.
+x-probe: &probe
+  interval: 3s
+  timeout: 5s
+  retries: 60
+  start_period: 5s
+
+services:
+  postgres:
+    image: postgres:18.3
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-miroclone-local} # gitleaks:allow
+    volumes:
+      - ./docker/initdb.sql:/docker-entrypoint-initdb.d/10-databases.sql:ro
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d authservice"]
+      interval: 2s
+      timeout: 3s
+      retries: 40
+
+  authservice:
+    image: ghcr.io/konradcinkusz/authservice:v0.3.4
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Username=postgres;Password=${POSTGRES_PASSWORD:-miroclone-local};Database=authservice # gitleaks:allow
+      Jwt__Algorithm: RS256
+      Jwt__PrivateKeyPem: ${AUTHSERVICE_JWT_PRIVATE_KEY:?run scripts/compose-up.sh, which generates the signing key}
+      Jwt__Issuer: MiroClone
+      Jwt__Audience: miro-clone
+      # The jwks_uri in the discovery document must be reachable by the services, so it names the container, not localhost.
+      Jwt__PublicBaseUrl: http://authservice:8080
+    ports:
+      - "127.0.0.1:5080:8080"
+    healthcheck:
+      <<: *probe
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && head -n1 <&3 | grep -q ' 200'"]
+
+  boards-service:
+    build: { context: ., dockerfile: MiroClone.BoardsService/Dockerfile }
+    image: miroclone/boards-service:local
+    depends_on:
+      postgres: { condition: service_healthy }
+      authservice: { condition: service_healthy }
+    environment:
+      <<: *authority
+      ConnectionStrings__boards: Host=postgres;Port=5432;Username=postgres;Password=${POSTGRES_PASSWORD:-miroclone-local};Database=boards # gitleaks:allow
+      Canvas__BaseUrl: http://canvas-service:8080/
+    ports:
+      - "127.0.0.1:5081:8080"
+    healthcheck:
+      <<: *probe
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health HTTP/1.0\\r\\n\\r\\n' >&3 && head -n1 <&3 | grep -q ' 200'"]
+
+  canvas-service:
+    build: { context: ., dockerfile: MiroClone.CanvasService/Dockerfile }
+    image: miroclone/canvas-service:local
+    depends_on:
+      postgres: { condition: service_healthy }
+      authservice: { condition: service_healthy }
+    environment:
+      <<: *authority
+      ConnectionStrings__canvas: Host=postgres;Port=5432;Username=postgres;Password=${POSTGRES_PASSWORD:-miroclone-local};Database=canvas # gitleaks:allow
+      Boards__BaseAddress: http://boards-service:8080/
+    ports:
+      - "127.0.0.1:5082:8080"
+    healthcheck:
+      <<: *probe
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health HTTP/1.0\\r\\n\\r\\n' >&3 && head -n1 <&3 | grep -q ' 200'"]
+
+  web:
+    build: { context: ., dockerfile: MiroClone.Web/Dockerfile }
+    image: miroclone/web:local
+    depends_on:
+      boards-service: { condition: service_healthy }
+      canvas-service: { condition: service_healthy }
+      authservice: { condition: service_healthy }
+    environment:
+      <<: *authority
+      services__boards-service__http__0: http://boards-service:8080
+      services__canvas-service__http__0: http://canvas-service:8080
+      # Sign-ins repeat from one address in the browser journeys; the limit itself is covered by AccountRateLimitingTests.
+      RateLimiting__AuthPermitLimit: "1000"
+      # The image's user cannot write under /app; the keys live on a volume, as on Fly (ADR 0019).
+      DataProtection__KeysPath: /data/keys
+    volumes:
+      - web_keys:/data/keys
+    ports:
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      <<: *probe
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health HTTP/1.0\\r\\n\\r\\n' >&3 && head -n1 <&3 | grep -q ' 200'"]
+
+volumes:
+  web_keys:

@@ -25,7 +25,8 @@ The last column says which work package built the path. Every path listed here e
 | `scripts/flyio-pr-database.sh` | Creates or drops a preview's databases and role on the dev PostgreSQL | WP13 |
 | `docs/DEPLOYMENT.md` | Owner steps, verification after the first deploy, operations | WP13 |
 | `.githooks/` + `scripts/install-hooks.sh` | Pre-commit gitleaks hook (fails closed) | WP00 |
-| `scripts/check-kernel-size.sh`, `scripts/run-local-stack.sh` | The kernel ceiling guard; the AppHost for development (needs Docker) | WP01, WP02 |
+| `scripts/check-kernel-size.sh`, `scripts/run-apphost.sh`, `scripts/run-local-stack.sh`, `scripts/compose-up.sh` | The kernel ceiling guard; the AppHost for development (needs Docker); the no-AppHost fallback; the compose estate | WP01, WP02, local-start fix |
+| `compose.yaml`, `docker/initdb.sql` | The whole estate in containers, mirroring the AppHost; the CI path of the `compose-e2e` job (ADR 0049) | local-start fix |
 | `MiroClone.AppHost` | Aspire composition root: PostgreSQL (`boards`, `canvas`, `authservice`), pinned authservice image, services, web | WP02, WP03 |
 | `MiroClone.ServiceDefaults` | Shared kernel (no domain types), ceiling 800 lines (ADR 0005) | WP01 |
 | `MiroClone.BoardsService` | Boards and favourites, PostgreSQL `boards`: `/api/boards`, migrations, canvas purge client | WP04 |
@@ -45,7 +46,7 @@ test project on its own with `dotnet test --project` (see `pr-validation.yml`), 
 
 Run `scripts/install-hooks.sh` once per clone so that secrets are caught before they are committed.
 
-Run the estate for development with `scripts/run-local-stack.sh` (needs a Docker daemon for PostgreSQL).
+Run the estate for development with `scripts/run-apphost.sh` (needs a Docker daemon). `scripts/compose-up.sh` runs the same estate in containers, as CI does. When the estate fails to start, read the logs before changing code.
 
 ## Rules that are easy to break
 
