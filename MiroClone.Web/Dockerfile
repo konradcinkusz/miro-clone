@@ -12,7 +12,10 @@ RUN dotnet restore MiroClone.Web/MiroClone.Web.csproj
 
 COPY MiroClone.ServiceDefaults/ MiroClone.ServiceDefaults/
 COPY MiroClone.Web/ MiroClone.Web/
-RUN dotnet publish MiroClone.Web/MiroClone.Web.csproj -c Release -o /app/publish --no-restore -p:UseAppHost=false
+# No --no-restore here, on purpose: a publish that reuses the project-files-only restore above produces no static web assets
+# (no _framework/blazor.web.js, no endpoints manifest), so the image serves 404 for the Blazor client and the stylesheet and no
+# circuit ever starts (ADR 0049). The packages are already in the restore layer, so this second restore is a no-op download-wise.
+RUN dotnet publish MiroClone.Web/MiroClone.Web.csproj -c Release -o /app/publish -p:UseAppHost=false
 
 # Runtime major (10) equals the target framework major: roll-forward does not cross a major.
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final

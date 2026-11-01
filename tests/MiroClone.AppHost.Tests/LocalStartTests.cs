@@ -69,6 +69,17 @@ public sealed class LocalStartTests
         Assert.DoesNotContain("BEGIN PRIVATE KEY", compose, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void TheWebImagePublishRestoresAfterTheSourcesAreCopiedSoItShipsTheBlazorClient()
+    {
+        var dockerfile = File.ReadAllLines(Path.Combine(RepositoryRoot, "MiroClone.Web", "Dockerfile"));
+        var publish = Assert.Single(dockerfile, line => line.TrimStart().StartsWith("RUN dotnet publish", StringComparison.Ordinal));
+
+        // Found in the first containerized CI run: with --no-restore the image has no _framework/blazor.web.js and no static asset
+        // endpoints, answers 404 for the Blazor client, and no circuit starts.
+        Assert.DoesNotContain("--no-restore", publish, StringComparison.Ordinal);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
