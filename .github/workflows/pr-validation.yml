@@ -134,8 +134,8 @@ jobs:
     env:
       MIROCLONE_E2E_REQUIRED: "1"
       MIROCLONE_E2E_AUTHENTICATED: "1"
-      MIROCLONE_E2E_BASE_URL: http://localhost:8080
-      MIROCLONE_E2E_AUTHSERVICE_URL: http://localhost:5080
+      MIROCLONE_E2E_BASE_URL: http://127.0.0.1:8080
+      MIROCLONE_E2E_AUTHSERVICE_URL: http://127.0.0.1:5080
       MIROCLONE_E2E_AUTHSERVICE_CONTAINER: miroclone-authservice-1
     steps:
       - name: Checkout
@@ -166,6 +166,10 @@ jobs:
         if: always()
         run: |
           mkdir -p compose-logs
+          echo "--- tail of each service log (the full logs are in the compose-logs artifact) ---"
+          for service in authservice boards-service canvas-service web; do
+            echo "=== $service ==="; docker compose logs --no-color --tail 40 "$service" 2>&1 || true
+          done
           for service in postgres authservice boards-service canvas-service web; do
             docker compose logs --no-color "$service" > "compose-logs/$service.log" 2>&1 || true
           done
