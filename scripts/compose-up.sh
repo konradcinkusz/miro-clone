@@ -14,6 +14,9 @@ if [[ ! -s "$key_file" ]]; then
   chmod 600 "$key_file"
 fi
 export AUTHSERVICE_JWT_PRIVATE_KEY="${AUTHSERVICE_JWT_PRIVATE_KEY:-$(cat "$key_file")}"
+# Also keep it in the gitignored .env, so that later `docker compose ps|logs|down` interpolate compose.yaml without the variable exported.
+printf 'AUTHSERVICE_JWT_PRIVATE_KEY="%s"\n' "$AUTHSERVICE_JWT_PRIVATE_KEY" > .env
+chmod 600 .env
 
 docker compose up --build --wait --wait-timeout 600 "$@"
 docker compose ps
