@@ -55,8 +55,25 @@ public sealed partial class Journey : IAsyncDisposable
         // The account pages are interactive-router pages (ADR 0042): the circuit takes over the form after the server render and
         // replaces what was typed before it connected, so the helper waits for the circuit before it types.
         await GoToInteractiveAsync("/sign-in");
-        await FillFieldAsync("#sign-in-email", account.Email);
-        await FillFieldAsync("#sign-in-password", account.Password);
+        // The circuit can still replace a value typed just before it settles (seen once the suite grew: the email box came back empty and the
+        // submit stayed on /sign-in). So both values are confirmed right before the click, and filled again when one was lost.
+        for (var attempt = 1; ; attempt++)
+        {
+            await FillFieldAsync("#sign-in-email", account.Email);
+            await FillFieldAsync("#sign-in-password", account.Password);
+            var email = await Page.Locator("#sign-in-email").InputValueAsync();
+            var password = await Page.Locator("#sign-in-password").InputValueAsync();
+            if (email == account.Email && password == account.Password)
+            {
+                break;
+            }
+
+            if (attempt == 3)
+            {
+                throw new InvalidOperationException($"The sign-in form kept losing what was typed after {attempt} attempts (email '{email}').");
+            }
+        }
+
         var ready = _circuit.ReadyCount;
         await Page.GetByTestId("sign-in-submit").ClickAsync();
         await Expect(Page).ToHaveURLAsync(new Regex("/$"));
