@@ -83,6 +83,17 @@ public sealed class EstateWiringTests
     }
 
     [Fact]
+    public async Task CanvasIsGivenTheAddressOfBoardsWithoutWaitingOnIt()
+    {
+        var resources = BuildModel().Resources.ToDictionary(resource => resource.Name);
+
+        var environment = await EnvironmentOf(resources["canvas-service"]);
+
+        Assert.Contains(environment.Keys, key => key.StartsWith("services__boards-service__", StringComparison.Ordinal));
+        Assert.DoesNotContain("boards-service", WaitsFor(resources["canvas-service"]));
+    }
+
+    [Fact]
     public void EveryServiceAndTheWebAppIsGatedOnItsHealthProbe()
     {
         var resources = BuildModel().Resources.ToDictionary(resource => resource.Name);

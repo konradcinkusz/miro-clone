@@ -87,6 +87,11 @@ public static class EstateExtensions
             .WithAuthority(authService)
             .WithHttpHealthCheck("/health");
 
+        // Canvas asks Boards whether the caller may see a board (BoardsAccessClient, "https+http://boards-service/" through service
+        // discovery). Without this reference the AppHost gave canvas no address for boards and every canvas read answered 503. No WaitFor,
+        // like the edge the other way: a wait in both directions would be a startup cycle. compose.yaml sets Boards__BaseAddress itself.
+        canvasService.WithReference(boardsService);
+
         builder
             .AddProject("web", ProjectPath(repositoryRoot, "MiroClone.Web"))
             .WithHttpEndpoint(port: ConfiguredPort(builder, WebPortKey), env: "ASPNETCORE_HTTP_PORTS")
