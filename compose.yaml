@@ -40,6 +40,8 @@ services:
 
   authservice:
     image: ghcr.io/konradcinkusz/authservice:v0.3.4
+    # A fixed name: the seed reads the dev outbox (the member's invitation token) from this container's log.
+    container_name: miroclone-authservice-1
     depends_on:
       postgres: { condition: service_healthy }
     environment:
@@ -89,10 +91,33 @@ services:
       <<: *probe
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health HTTP/1.0\\r\\n\\r\\n' >&3 && head -n1 <&3 | grep -q ' 200'"]
 
+  # The demo data (ADR 0050): the same one-shot program the AppHost runs. It creates the two demo users, their organization and the demo
+  # boards through the public APIs, then exits 0. `SEED_ENABLED=false docker compose up` skips it. Development only: it runs as root with
+  # the Docker socket so it can read the invitation token that authservice's dev outbox prints.
+  seed:
+    build: { context: ., dockerfile: MiroClone.Seed/Dockerfile }
+    image: miroclone/seed:local
+    user: root
+    restart: "no"
+    depends_on:
+      authservice: { condition: service_healthy }
+      boards-service: { condition: service_healthy }
+      canvas-service: { condition: service_healthy }
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Seed__Enabled: ${SEED_ENABLED:-true}
+      Seed__AuthServiceUrl: http://authservice:8080
+      Seed__BoardsUrl: http://boards-service:8080
+      Seed__CanvasUrl: http://canvas-service:8080
+      Seed__AuthServiceContainer: miroclone-authservice-1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
   web:
     build: { context: ., dockerfile: MiroClone.Web/Dockerfile }
     image: miroclone/web:local
     depends_on:
+      seed: { condition: service_completed_successfully }
       boards-service: { condition: service_healthy }
       canvas-service: { condition: service_healthy }
       authservice: { condition: service_healthy }

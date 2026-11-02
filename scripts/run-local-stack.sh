@@ -60,5 +60,10 @@ start boards-service MiroClone.BoardsService 5081 "ConnectionStrings__boards=${c
 start canvas-service MiroClone.CanvasService 5082 "ConnectionStrings__canvas=${conn}canvas" Boards__BaseAddress=http://127.0.0.1:5081/
 start web MiroClone.Web 8080 services__boards-service__http__0=http://127.0.0.1:5081 services__canvas-service__http__0=http://127.0.0.1:5082
 
+# The demo data (ADR 0050), unless SEED_ENABLED=false. The member's invitation token is read from the authservice container's log.
+if [[ "${SEED_ENABLED:-true}" != "false" ]]; then
+  AUTHSERVICE_CONTAINER=miroclone-local-authservice scripts/seed-dev-users.sh
+fi
+
 echo "Estate is up: Web http://localhost:8080  authservice http://localhost:5080. Ctrl+C stops it."
 wait

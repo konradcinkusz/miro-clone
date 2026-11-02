@@ -52,20 +52,26 @@ them (fail closed, ADR 0011). Choosing an active workspace needs an authservice 
 
    The authservice endpoint is on the dashboard (AppHost), or <http://localhost:5080> (compose, run-local-stack).
 
-3. Seed two users in one organization (owner and member). The seed is safe to run again.
+3. **The demo users are seeded for you** (ADR 0050). Every start of the estate runs the seed after authservice, boards-service and
+   canvas-service are healthy: `scripts/run-apphost.sh` (a project resource, Development only), `scripts/compose-up.sh` (a one-shot `seed`
+   container) and `scripts/run-local-stack.sh` do it through the same program, `MiroClone.Seed`. It talks to the public APIs only, never to
+   a database, and a second run changes nothing.
 
-   ```bash
-   scripts/seed-dev-users.sh http://localhost:<port>
-   ```
+   | Who | Email | Password | Role |
+   |---|---|---|---|
+   | Owner | `owner@dev.test` | `Dev-Password-123!` | Owner of the `Dev Workspace` organization |
+   | Member | `member@dev.test` | `Dev-Password-123!` | Member of the same organization |
 
-   The member's invitation token is written to the authservice log, not returned. On the first run the script stops and
-   says so. Find the newest `Invitation token:` line in the dashboard's authservice log, then run:
+   These are published development values, not secrets: they satisfy authservice's password rule and exist only on your machine. The
+   seed refuses to run unless `ASPNETCORE_ENVIRONMENT=Development`. It creates three boards whose titles start with `Demo: `
+   (`Welcome` and `Sprint planning` with shapes, and an empty one). That prefix, the `dev.test` addresses, the organization name and
+   layer ids derived from fixed names are the seed's namespace: `--reset` removes only boards in it.
 
-   ```bash
-   INVITATION_TOKEN=<token> scripts/seed-dev-users.sh http://localhost:<port>
-   ```
-
-   `SEED_PASSWORD` sets the password for both seed users. The default is for development only.
+   - Switch it off: `dotnet run --project MiroClone.AppHost -- --Seed:Enabled=false`, or `SEED_ENABLED=false scripts/compose-up.sh`.
+   - Run it by hand against a running estate, or reset the demo boards: `scripts/seed-dev-users.sh [--reset]`. Check it: `scripts/verify-seed.sh`.
+   - The member's invitation token is not returned by authservice. Its dev outbox prints it to the container's console, and the seed
+     reads it from there over the Docker socket (`Seed__AuthServiceContainer`; compose mounts the socket into the seed container, which is
+     why that container runs as root). Without a Docker socket set `Seed__AuthServiceLogFile` or `Seed__InvitationToken`.
 
 4. Check the protected path. Use the boards-service address from the dashboard.
 
@@ -76,7 +82,7 @@ them (fail closed, ADR 0011). Choosing an active workspace needs an authservice 
    # Accepted with a token: 200, with the user and the workspace
    TOKEN=$(curl -s -X POST http://localhost:<authservice>/api/v1/auth/login \
      -H 'Content-Type: application/json' \
-     -d '{"email":"owner@dev.test","password":"<SEED_PASSWORD>"}' | jq -r .accessToken)
+     -d '{"email":"owner@dev.test","password":"Dev-Password-123!"}' | jq -r .accessToken)
    curl -s -H "Authorization: Bearer $TOKEN" http://localhost:<boards>/api/session
    ```
 
@@ -84,12 +90,12 @@ them (fail closed, ADR 0011). Choosing an active workspace needs an authservice 
 
 | Call | authservice route | Used by |
 |---|---|---|
-| Register | `POST /api/v1/auth/register` | `scripts/seed-dev-users.sh` |
-| Sign in | `POST /api/v1/auth/login` | seed script; WP06 |
-| List organizations | `GET /api/v1/organizations` | seed script |
-| Create organization | `POST /api/v1/organizations` | seed script |
-| Invite | `POST /api/v1/organizations/{id}/invite` | seed script |
-| Accept invitation | `POST /api/v1/organizations/invitations/accept` | seed script |
+| Register | `POST /api/v1/auth/register` | `MiroClone.Seed` |
+| Sign in | `POST /api/v1/auth/login` | seed; WP06 |
+| List organizations | `GET /api/v1/organizations` | seed |
+| Create organization | `POST /api/v1/organizations` | seed |
+| Invite | `POST /api/v1/organizations/{id}/invite` | seed |
+| Accept invitation | `POST /api/v1/organizations/invitations/accept` | seed |
 | Sign in | `POST /api/v1/auth/login` | web app sign-in (WP06) |
 | Refresh | `POST /api/v1/auth/refresh` | web app session refresh (WP06, ADR 0023) |
 | Sign out | `POST /api/v1/auth/logout` | web app sign-out (WP06) |

@@ -17,7 +17,8 @@ The last column says which work package built the path. Every path listed here e
 | `docs/ARCHITECTURE.md`, `docs/UI-UX.md`, `docs/PRIVACY.md`, `docs/TESTING.md`, `docs/architecture/COMPLIANCE.md` | The design as built, the open UI backlog, personal data, what each test proves, the reference-architecture register | WP14 |
 | `docs/ARCHITECTURE_REVIEW.md`, `docs/SECURITY_REVIEW.md` | The final audit findings and their status | WP15 |
 | `docs/AUTH.md` | Claims, token rules and the dev sign-in flow against authservice | WP03 |
-| `scripts/seed-dev-users.sh` | Seeds two dev users in one authservice organization over its API | WP03 |
+| `scripts/seed-dev-users.sh`, `scripts/verify-seed.sh` | Run `MiroClone.Seed` against a running estate (`--reset` removes the `Demo: ` boards); check that both demo users see the demo boards | WP03, ADR 0050 |
+| `MiroClone.Seed` | The demo seed: two users in one organization and the `Demo: ` boards, through the public APIs, idempotent, Development only. Run by the AppHost and by the compose `seed` service | ADR 0050 |
 | `.github/workflows/` | `pr-validation` (kernel guard, restore, build, per-project tests, E2E job, Docker builds), `secret-scan` (gitleaks) | WP00, WP12, WP13 |
 | `flyio/` | Fly.io config, one `*.fly.toml` per app, `SECRETS.md`, `INFRASTRUCTURE-ANALYSIS.md` | WP13 |
 | `MiroClone.*/Dockerfile`, `.dockerignore` | Production images; build context is the repository root | WP13 |
@@ -32,7 +33,7 @@ The last column says which work package built the path. Every path listed here e
 | `MiroClone.BoardsService` | Boards and favourites, PostgreSQL `boards`: `/api/boards`, migrations, canvas purge client | WP04 |
 | `MiroClone.CanvasService` | Canvas aggregate (`Canvas/`), write-behind JSON snapshot (`Persistence/`, ADR 0015), SignalR `/hubs/canvas` and REST `/api/canvas` (`Realtime/`, `Api/`, ADR 0016) | WP05 |
 | `MiroClone.Web` | Blazor Web App, interactive Server; the BFF. Sign-in, server-side sessions, dashboard, board canvas, visual token contract (`wwwroot/app.css`) | WP02, WP06 to WP11 |
-| `tests/` | One xUnit project per service; `Web.Tests` (bUnit, TestServer); `Web.E2E` (Playwright, starts the estate itself: ADR 0039, ADR 0041; skips or fails per ADR 0040); `AppHost.Tests`; `BoardsService.Tests`; `CanvasService.Tests`; `ServiceDefaults.Tests`; `TestSupport` (local authservice stand-in and token factory, offline) | WP01 to WP12 |
+| `tests/` | One xUnit project per service (and `Seed.Tests`); `Web.Tests` (bUnit, TestServer); `Web.E2E` (Playwright, starts the estate itself: ADR 0039, ADR 0041; skips or fails per ADR 0040); `AppHost.Tests`; `BoardsService.Tests`; `CanvasService.Tests`; `ServiceDefaults.Tests`; `TestSupport` (local authservice stand-in and token factory, offline) | WP01 to WP12 |
 
 ## Build and test
 
