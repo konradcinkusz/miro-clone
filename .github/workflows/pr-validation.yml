@@ -238,7 +238,7 @@ jobs:
       - name: Start the AppHost (http launch profile, Development, seed on)
         run: |
           key="$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048)"
-          nohup env "Parameters__authservice-jwt-private-key=$key" Estate__WebPort=8080 Estate__AuthServicePort=5080 Estate__BoardsPort=5081 Estate__CanvasPort=5082 Estate__EphemeralData=true \
+          nohup env DOTNET_ENVIRONMENT=Development ASPNETCORE_ENVIRONMENT=Development "Parameters__authservice-jwt-private-key=$key" Estate__WebPort=8080 Estate__AuthServicePort=5080 Estate__BoardsPort=5081 Estate__CanvasPort=5082 Estate__EphemeralData=true \
             dotnet run --project MiroClone.AppHost > apphost.log 2>&1 &
           echo $! > apphost.pid
           for attempt in $(seq 1 150); do
@@ -286,6 +286,8 @@ jobs:
       - name: Logs
         if: always()
         run: |
+          echo '--- aspire CLI logs ---'; tail -n 120 ~/.aspire/logs/*.log 2>/dev/null || true
+          echo '--- verify.log ---'; cat verify.log 2>/dev/null || true
           docker logs miroclone-authservice-apphost 2>&1 | head -n 80 || true
           tail -n 200 apphost.log || true
 
