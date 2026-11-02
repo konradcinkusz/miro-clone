@@ -76,7 +76,16 @@ public sealed partial class Journey : IAsyncDisposable
 
         var ready = _circuit.ReadyCount;
         await Page.GetByTestId("sign-in-submit").ClickAsync();
-        await Expect(Page).ToHaveURLAsync(new Regex("/$"));
+        try
+        {
+            await Expect(Page).ToHaveURLAsync(new Regex("/$"));
+        }
+        catch (PlaywrightException error)
+        {
+            // The form posts and the server redirects back on a refusal. Say what the browser saw, so a refusal explains itself.
+            throw new InvalidOperationException($"Sign-in as {account.Email} did not reach the dashboard. {_circuit.Report()}", error);
+        }
+
         await _circuit.WaitForReadyAsync(ready + 1);
         await Expect(Page.GetByTestId("signed-in-email")).ToHaveTextAsync(account.Email);
     }
