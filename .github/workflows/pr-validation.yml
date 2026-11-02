@@ -235,6 +235,11 @@ jobs:
         with:
           global-json-file: global.json
 
+      # One build first: the AppHost starts the services and the seed as parallel `dotnet run` builds of the shared ServiceDefaults project,
+      # which collide on its deps file ("GenerateDepsFile ... file in use") and leave a service unstarted (ADR 0050).
+      - name: Build the estate once (Debug, as the AppHost runs it)
+        run: dotnet build MiroClone.sln --nologo -v quiet
+
       - name: Start the AppHost (http launch profile, Development, seed on)
         run: |
           key="$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048)"

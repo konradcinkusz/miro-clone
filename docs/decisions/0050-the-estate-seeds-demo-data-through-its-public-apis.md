@@ -36,7 +36,10 @@ had never run end to end in the session that wrote it, because that session coul
 
 ## Result of the DCP experiment
 
-See the section "Verification" appended below once the first run of `apphost-e2e` has finished.
+Aspire's DCP **does run on a GitHub-hosted runner** (ubuntu): the AppHost started PostgreSQL and the real `ghcr.io/konradcinkusz/authservice:v0.3.4` container
+(`RS256`, `/health/ready` 200) and the services. ADR 0049's claim that it does not was wrong for the `dotnet run --project MiroClone.AppHost` path.
+The experiment found a real defect: the AppHost starts the services and the seed as parallel `dotnet run` builds, which collide on the shared
+`ServiceDefaults` deps file (`MSB4018 GenerateDepsFile ... file in use`) and leave a service unstarted. `scripts/run-apphost.sh` and the CI job build the solution once first.
 
 ## Consequences
 
