@@ -241,12 +241,20 @@ jobs:
           nohup env DOTNET_ENVIRONMENT=Development ASPNETCORE_ENVIRONMENT=Development "Parameters__authservice-jwt-private-key=$key" Estate__WebPort=8080 Estate__AuthServicePort=5080 Estate__BoardsPort=5081 Estate__CanvasPort=5082 Estate__EphemeralData=true \
             dotnet run --project MiroClone.AppHost > apphost.log 2>&1 &
           echo $! > apphost.pid
-          for attempt in $(seq 1 150); do
-            if curl -fsS -m 5 http://127.0.0.1:8080/health > /dev/null 2>&1; then echo "web healthy after $((attempt * 4))s"; exit 0; fi
-            if ! kill -0 "$(cat apphost.pid)" 2> /dev/null; then echo "the AppHost exited"; tail -n 80 apphost.log; exit 1; fi
-            sleep 4
+          deadline=$((SECONDS + 420))
+          while (( SECONDS < deadline )); do
+            if curl -fsS -m 3 http://127.0.0.1:8080/health > /dev/null 2>&1; then echo "web healthy after ${SECONDS}s"; exit 0; fi
+            if ! kill -0 "$(cat apphost.pid)" 2> /dev/null; then echo "the AppHost exited"; break; fi
+            sleep 3
           done
-          echo "the web app did not become healthy"; tail -n 80 apphost.log; docker ps -a; exit 1
+          echo "::group::diagnostics: the web app did not become healthy"
+          docker ps -a --format '{{.Names}} | {{.Image}} | {{.Status}}'
+          ps -eo pid,etime,args | grep -E 'MiroClone|dcp' | grep -v grep | cut -c1-200 || true
+          echo '--- apphost.log (tail) ---'; tail -n 60 apphost.log
+          for f in ~/.aspire/logs/*.log; do echo "--- $f (tail) ---"; tail -n 60 "$f"; done
+          for f in /tmp/aspire*/* /tmp/dcp*/* ~/.aspire/dcp/* ; do [ -f "$f" ] && { echo "--- $f (tail) ---"; tail -n 40 "$f"; }; done 2> /dev/null || true
+          echo "::endgroup::"
+          exit 1
 
       - name: Container state and the AppHost log
         if: always()
