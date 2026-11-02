@@ -269,6 +269,12 @@ jobs:
           for attempt in $(seq 1 45); do
             if scripts/verify-seed.sh > verify.log 2>&1; then break; fi
             sleep 4
+            if (( attempt == 10 )); then
+              echo '::group::the AppHost seed did not leave the demo data; its DCP log and a manual run of the same program'
+              find /tmp -path '*seed*' -type f -name '*' 2> /dev/null | head -20 | while read -r f; do echo "--- $f ---"; tail -n 40 "$f"; done
+              AUTHSERVICE_CONTAINER=miroclone-authservice-apphost scripts/seed-dev-users.sh || echo "manual seed exit code $?"
+              echo '::endgroup::'
+            fi
           done
           {
             echo '### authservice (ghcr.io/konradcinkusz/authservice:v0.3.4) under the Aspire AppHost'
