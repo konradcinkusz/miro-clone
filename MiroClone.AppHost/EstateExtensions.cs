@@ -53,7 +53,7 @@ public static class EstateExtensions
             .WithImageRegistry(AuthServiceRegistry)
             // A fixed name, so the seed can read the dev outbox (the invitation token) from this container's log.
             .WithContainerName(AuthServiceContainerName)
-            .WithHttpEndpoint(port: ConfiguredPort(builder, AuthServicePortKey), targetPort: 8080, name: "http")
+            .WithHttpEndpoint(port: AuthServicePort(builder), targetPort: 8080, name: "http")
             .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development")
             .WithEnvironment("ConnectionStrings__DefaultConnection", authDatabase.Resource.ConnectionStringExpression)
             .WithEnvironment("Jwt__Algorithm", "RS256")
@@ -63,8 +63,10 @@ public static class EstateExtensions
             .WaitFor(authDatabase)
             .WithHttpHealthCheck("/health/ready");
 
-        // Its own public origin: the jwks_uri in the discovery document must be reachable by the services (docs/DEPLOYMENT.md).
-        authService.WithEnvironment("Jwt__PublicBaseUrl", AuthorityUrl(authService));
+        // Its own public origin: the jwks_uri in the discovery document must be reachable by the services (docs/DEPLOYMENT.md). The services
+        // run on the host here, so this is the host address and the fixed port, never the container-network name that Aspire resolves for a
+        // container's reference to itself (the first apphost-e2e run: boards answered 401 to a valid token because it could not fetch the keys).
+        authService.WithEnvironment("Jwt__PublicBaseUrl", string.Create(System.Globalization.CultureInfo.InvariantCulture, $"http://localhost:{AuthServicePort(builder)}"));
 
         var canvasService = builder
             .AddProject("canvas-service", ProjectPath(repositoryRoot, "MiroClone.CanvasService"))
@@ -160,12 +162,18 @@ public static class EstateExtensions
     public const string EphemeralDataKey = "Estate:EphemeralData";
     public const string WebPortKey = "Estate:WebPort";
     public const string AuthServicePortKey = "Estate:AuthServicePort";
+    /// <summary>The host port of authservice when none is configured. The same port compose publishes, so the address in this repository's docs holds for both paths.</summary>
+    public const int DefaultAuthServicePort = 5080;
+
     public const string BoardsPortKey = "Estate:BoardsPort";
     public const string CanvasPortKey = "Estate:CanvasPort";
 
     /// <summary>A fixed host port from configuration, or null so Aspire assigns one.</summary>
     private static int? ConfiguredPort(IDistributedApplicationBuilder builder, string key) =>
         builder.Configuration.GetValue<int?>(key);
+
+    private static int AuthServicePort(IDistributedApplicationBuilder builder) =>
+        builder.Configuration.GetValue<int?>(AuthServicePortKey) ?? DefaultAuthServicePort;
 
     private static ReferenceExpression AuthorityUrl(IResourceBuilder<ContainerResource> authService) =>
         ReferenceExpression.Create($"{authService.GetEndpoint("http").Property(EndpointProperty.Url)}");

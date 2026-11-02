@@ -277,6 +277,10 @@ jobs:
             if (( attempt == 10 )); then
               echo '::group::the AppHost seed did not leave the demo data; its DCP log and a manual run of the same program'
               find /tmp -path '*seed*' -type f -name '*' 2> /dev/null | head -20 | while read -r f; do echo "--- $f ---"; tail -n 40 "$f"; done
+              echo '--- discovery document ---'; curl -sS http://127.0.0.1:5080/.well-known/openid-configuration | head -c 600; echo
+              echo '--- boards-service: GET /api/session with a token ---'
+              t=$(curl -sS -H 'Content-Type: application/json' -d '{"email":"owner@dev.test","password":"Dev-Password-123!"}' http://127.0.0.1:5080/api/v1/auth/login | jq -r .accessToken) # gitleaks:allow
+              curl -sS -i -H "Authorization: Bearer $t" http://127.0.0.1:5081/api/session | head -n 12
               AUTHSERVICE_CONTAINER=miroclone-authservice-apphost scripts/seed-dev-users.sh || echo "manual seed exit code $?"
               echo '::endgroup::'
             fi
