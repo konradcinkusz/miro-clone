@@ -276,7 +276,11 @@ jobs:
             sleep 4
             if (( attempt == 10 )); then
               echo '::group::the AppHost seed did not leave the demo data; its DCP log and a manual run of the same program'
-              find /tmp -path '*seed*' -type f -name '*' 2> /dev/null | head -20 | while read -r f; do echo "--- $f ---"; tail -n 40 "$f"; done
+              echo '--- DCP files (names) ---'; find /tmp -path '/tmp/aspire-dcp*' -type f -size +0 ! -name '*.pem' ! -name '*.crt' ! -name '*.key' 2> /dev/null | head -60
+              find /tmp -path '/tmp/aspire-dcp*' -type f ! -name '*.pem' ! -name '*.crt' ! -name '*.key' \( -name '*out*' -o -name '*err*' -o -name '*.log' \) 2> /dev/null | grep -E 'seed|web' | while read -r f; do echo "--- $f ---"; tail -n 40 "$f"; done
+              echo '--- web: the stylesheet and the Blazor script ---'
+              css=$(curl -sS http://127.0.0.1:8080/ | grep -o '[A-Za-z.]*styles\.css[^"]*' | head -1); echo "css=$css"
+              curl -sS -i "http://127.0.0.1:8080/_framework/blazor.web.js" | head -n 40
               echo '--- discovery document ---'; curl -sS http://127.0.0.1:5080/.well-known/openid-configuration | head -c 600; echo
               echo '--- boards-service: GET /api/session with a token ---'
               t=$(curl -sS -H 'Content-Type: application/json' -d '{"email":"owner@dev.test","password":"Dev-Password-123!"}' http://127.0.0.1:5080/api/v1/auth/login | jq -r .accessToken) # gitleaks:allow
