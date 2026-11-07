@@ -27,13 +27,19 @@ try
 
     var result = await seeder.RunAsync(settings.Reset, cancellation.Token);
     Console.WriteLine(
-        $"seed: done. organization {result.Organization}; registered {result.UsersRegistered}, boards created {result.BoardsCreated}, shapes added {result.LayersAdded}, boards removed {result.BoardsRemoved}.");
+        $"seed: done. organizations {string.Join(", ", result.Organizations.Select(pair => $"'{pair.Key}' {pair.Value}"))}; registered {result.UsersRegistered}, boards created {result.BoardsCreated}, shapes added {result.LayersAdded}, boards removed {result.BoardsRemoved}.");
     Console.WriteLine();
     Console.WriteLine("seed: ============================ DEMO LOGINS (development only) ============================");
-    Console.WriteLine($"seed:   {"owner",-8} {DemoData.OwnerEmail,-18} {DemoData.Password}   owner of '{DemoData.OrganizationName}'");
-    Console.WriteLine($"seed:   {"member",-8} {DemoData.MemberEmail,-18} {DemoData.Password}   member of '{DemoData.OrganizationName}'");
-    Console.WriteLine($"seed:   boards: {string.Join(", ", DemoData.Boards.Select(board => board.Title))}");
-    Console.WriteLine("seed:   sign in as one in each of two browsers to edit a board together live.");
+    foreach (var workspace in DemoData.Workspaces)
+    {
+        foreach (var user in workspace.Users)
+        {
+            Console.WriteLine($"seed:   {user.Role,-7} {user.Email,-18} {DemoData.Password}   {user.Role.ToLowerInvariant()} of '{workspace.Name}'");
+        }
+    }
+
+    Console.WriteLine($"seed:   boards: {string.Join(", ", DemoData.Workspaces.SelectMany(workspace => workspace.Boards).Select(board => board.Title))}");
+    Console.WriteLine("seed:   sign in as two users in two browsers to edit a board together live; the Other Workspace user cannot see the Dev Workspace boards.");
     Console.WriteLine("seed: ========================================================================================");
     return 0;
 }

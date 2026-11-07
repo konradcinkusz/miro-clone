@@ -6,7 +6,9 @@
     <h1 id="sign-out-heading">Sign out</h1>
     <p>Signing out ends this session on this device.</p>
     <form method="post" action="/account/sign-out" class="stack" data-testid="sign-out-form">
+        <InteractiveFieldset>
         <AntiforgeryToken />
         <button class="btn btn-primary" type="submit" data-testid="sign-out-submit">Sign out</button>
+        </InteractiveFieldset>
     </form>
 </section>

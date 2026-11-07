@@ -19,6 +19,7 @@
     }
 
     <form method="post" action="/account/verify-email" class="stack" data-testid="verify-form">
+        <InteractiveFieldset>
         <AntiforgeryToken />
         <div class="field">
             <label for="verify-email">Email</label>
@@ -29,12 +30,15 @@
             <input id="verify-token" name="token" type="text" autocomplete="one-time-code" required value="@Token" />
         </div>
         <button class="btn btn-primary" type="submit" data-testid="verify-submit">Verify email</button>
+        </InteractiveFieldset>
     </form>
 
     <form method="post" action="/account/resend-verification" class="stack" data-testid="resend-form">
+        <InteractiveFieldset>
         <AntiforgeryToken />
         <input type="hidden" name="email" value="@Email" />
         <button class="btn btn-quiet" type="submit" data-testid="resend-submit">Send a new link</button>
+        </InteractiveFieldset>
     </form>
 </section>
 

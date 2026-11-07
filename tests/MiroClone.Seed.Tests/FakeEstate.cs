@@ -14,8 +14,9 @@ internal sealed class FakeEstate : HttpMessageHandler
     private readonly Dictionary<string, Guid> _organizations = [];
     private readonly Dictionary<Guid, HashSet<Guid>> _memberships = [];
     private readonly Dictionary<Guid, (Guid Workspace, string Title)> _boards = [];
-    private readonly HashSet<string> _invitations = [];
-    private Guid _pendingInvitationFor;
+    private readonly Dictionary<string, (Guid Organization, string Role)> _invitedEmails = [];
+    private readonly Dictionary<string, (Guid User, Guid Organization, string Role)> _pending = [];
+    private readonly Dictionary<(Guid User, Guid Organization), string> _roles = [];
 
     public int Registrations { get; private set; }
 
@@ -24,6 +25,10 @@ internal sealed class FakeEstate : HttpMessageHandler
     public IReadOnlyDictionary<Guid, (Guid Workspace, string Title)> Boards => _boards;
 
     public IReadOnlyDictionary<string, Guid> Organizations => _organizations;
+
+    public IReadOnlyDictionary<(Guid User, Guid Organization), string> Roles => _roles;
+
+    public Guid UserId(string email) => _users[email].Id;
 
     public string LastInvitationToken { get; private set; } = string.Empty;
 
@@ -41,7 +46,7 @@ internal sealed class FakeEstate : HttpMessageHandler
             ("GET", "/api/v1/auth/consents/versions") => Json(new { terms = Terms, privacy = Terms }),
             ("POST", "/api/v1/auth/register") => Register(body),
             ("POST", "/api/v1/auth/login") => Login(body),
-            ("GET", "/api/v1/organizations") => Json(_organizations.Select(pair => new { id = pair.Value.ToString("D"), name = pair.Key })),
+            ("GET", "/api/v1/organizations") => ListOrganizations(caller),
             ("POST", "/api/v1/organizations") => CreateOrganization(caller, body),
             ("POST", "/api/v1/organizations/invitations/accept") => Accept(caller, body),
             ("GET", "/api/boards") => ListBoards(caller),
@@ -73,35 +78,43 @@ internal sealed class FakeEstate : HttpMessageHandler
             : new HttpResponseMessage(HttpStatusCode.Unauthorized);
     }
 
+    private HttpResponseMessage ListOrganizations(Guid caller) =>
+        Json(_organizations.Where(pair => _memberships.TryGetValue(caller, out var set) && set.Contains(pair.Value))
+            .Select(pair => new { id = pair.Value.ToString("D"), name = pair.Key }));
+
     private HttpResponseMessage CreateOrganization(Guid caller, JsonElement body)
     {
         var id = Guid.NewGuid();
         _organizations[body.GetProperty("name").GetString()!] = id;
-        Join(caller, id);
+        Join(caller, id, "Owner");
         return Json(new { id = id.ToString("D") });
     }
 
     private HttpResponseMessage Invite(string path, JsonElement body)
     {
-        if (!_invitations.Add(body.GetProperty("email").GetString()!))
+        var email = body.GetProperty("email").GetString()!;
+        var organization = Guid.Parse(path.Split('/')[^2]);
+        if (_invitedEmails.ContainsKey(email))
         {
             return new HttpResponseMessage(HttpStatusCode.BadRequest);
         }
 
+        var role = body.GetProperty("role").GetString()!;
+        _invitedEmails[email] = (organization, role);
         InvitesSent++;
-        _pendingInvitationFor = _users[body.GetProperty("email").GetString()!].Id;
         LastInvitationToken = $"inv-{Guid.NewGuid():N}";
+        _pending[LastInvitationToken] = (_users[email].Id, organization, role);
         return new HttpResponseMessage(HttpStatusCode.OK);
     }
 
     private HttpResponseMessage Accept(Guid caller, JsonElement body)
     {
-        if (body.GetProperty("token").GetString() != LastInvitationToken || caller != _pendingInvitationFor)
+        if (!_pending.Remove(body.GetProperty("token").GetString()!, out var invitation) || invitation.User != caller)
         {
             return new HttpResponseMessage(HttpStatusCode.BadRequest);
         }
 
-        Join(caller, _organizations.Values.Single());
+        Join(caller, invitation.Organization, invitation.Role);
         return new HttpResponseMessage(HttpStatusCode.OK);
     }
 
@@ -140,12 +153,13 @@ internal sealed class FakeEstate : HttpMessageHandler
     public Guid AddRealBoardInWorkspace(string title)
     {
         var id = Guid.NewGuid();
-        _boards[id] = (_organizations.Values.Single(), title);
+        _boards[id] = (_organizations[DemoData.OrganizationName], title);
         return id;
     }
 
-    private void Join(Guid user, Guid organization)
+    private void Join(Guid user, Guid organization, string role)
     {
+        _roles[(user, organization)] = role;
         if (!_memberships.TryGetValue(user, out var set))
         {
             _memberships[user] = set = [];

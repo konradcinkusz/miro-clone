@@ -52,46 +52,24 @@ public sealed partial class Journey : IAsyncDisposable
     /// <summary>Signs in through the account form and waits for the dashboard's circuit.</summary>
     public async Task SignInAsync(Account account)
     {
-        // The account pages are interactive-router pages (ADR 0042): the circuit takes over the form after the server render and
-        // replaces what was typed before it connected, so the helper waits for the circuit before it types.
+        // The account pages are interactive-router pages (ADR 0042): the circuit replaces the prerendered form. The prerendered form is
+        // disabled (ADR 0051), so there is nothing to lose: the fields take input only once they are the interactive ones.
         await GoToInteractiveAsync("/sign-in");
-        // The circuit's first render can still replace the prerendered form just after it reports ready (a slower estate, such as the Debug-built
-        // AppHost, shows it): a typed value is lost, or a click lands on the element that is being replaced and no POST is sent. So each attempt
-        // fills both fields, confirms them, clicks, and waits a short while for the dashboard; an attempt that changed nothing is repeated.
+        await WaitForSignInFormAsync();
         var ready = _circuit.ReadyCount;
-        for (var attempt = 1; ; attempt++)
-        {
-            await FillFieldAsync("#sign-in-email", account.Email);
-            await FillFieldAsync("#sign-in-password", account.Password);
-            if (await Page.Locator("#sign-in-email").InputValueAsync() != account.Email
-                || await Page.Locator("#sign-in-password").InputValueAsync() != account.Password)
-            {
-                if (attempt == 4)
-                {
-                    throw new InvalidOperationException($"The sign-in form kept losing what was typed. {_circuit.Report()}");
-                }
-
-                continue;
-            }
-
-            await Page.GetByTestId("sign-in-submit").ClickAsync();
-            try
-            {
-                await Expect(Page).ToHaveURLAsync(new Regex("/$"), new PageAssertionsToHaveURLOptions { Timeout = attempt == 4 ? 15_000 : 6_000 });
-                break;
-            }
-            catch (PlaywrightException error) when (attempt < 4)
-            {
-                Console.WriteLine($"sign-in attempt {attempt} as {account.Email} stayed on {Page.Url}: {error.Message.Split('\n')[0]}");
-            }
-            catch (PlaywrightException error)
-            {
-                throw new InvalidOperationException($"Sign-in as {account.Email} did not reach the dashboard after {attempt} attempts. {_circuit.Report()}", error);
-            }
-        }
-
+        await FillFieldAsync("#sign-in-email", account.Email);
+        await FillFieldAsync("#sign-in-password", account.Password);
+        await Page.GetByTestId("sign-in-submit").ClickAsync();
+        await Expect(Page).ToHaveURLAsync(new Regex("/$"), new PageAssertionsToHaveURLOptions { Timeout = 15_000 });
         await _circuit.WaitForReadyAsync(ready + 1);
         await Expect(Page.GetByTestId("signed-in-email")).ToHaveTextAsync(account.Email);
+    }
+
+    /// <summary>Waits until the sign-in form takes input: its fields are enabled only on the interactive render (ADR 0051).</summary>
+    public async Task WaitForSignInFormAsync()
+    {
+        await Expect(Page.Locator("#sign-in-email")).ToBeEnabledAsync();
+        await Expect(Page.GetByTestId("sign-in-submit")).ToBeEnabledAsync();
     }
 
     /// <summary>

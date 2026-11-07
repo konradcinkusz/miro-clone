@@ -1,0 +1,8 @@
+@* The account forms post natively, but the interactive render replaces the prerendered markup (ADR 0042), and anything typed or clicked
+   before that is lost. The prerendered form is therefore disabled, and the interactive render enables it (ADR 0051). *@
+<fieldset class="form-fieldset stack" disabled="@(!RendererInfo.IsInteractive)">@ChildContent</fieldset>
+
+@code {
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

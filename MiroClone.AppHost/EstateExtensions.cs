@@ -94,9 +94,12 @@ public static class EstateExtensions
         // like the edge the other way: a wait in both directions would be a startup cycle. compose.yaml sets Boards__BaseAddress itself.
         canvasService.WithReference(boardsService);
 
+        var seedRequested = SeedRequested(builder);
         builder
             .AddProject("web", ProjectPath(repositoryRoot, "MiroClone.Web"))
             .WithHostEnvironment(builder)
+            // The sign-in page lists the demo logins only in Development with seeding on (ADR 0051): the web app reads the seed's own switch.
+            .WithEnvironment("Seed__Enabled", seedRequested ? "true" : "false")
             .WithHttpEndpoint(port: ConfiguredPort(builder, WebPortKey), env: "ASPNETCORE_HTTP_PORTS")
             .WithExternalHttpEndpoints()
             .WithReference(boardsService)
@@ -106,7 +109,7 @@ public static class EstateExtensions
             .WithAuthority(authService)
             .WithHttpHealthCheck("/health");
 
-        if (SeedRequested(builder))
+        if (seedRequested)
         {
             AddSeed(builder, repositoryRoot, authService, boardsService, canvasService);
         }

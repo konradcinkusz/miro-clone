@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Seeds the demo estate (two users in one organization, and the demo boards) into a running estate, by running the same program the
-# AppHost and compose.yaml run (MiroClone.Seed, ADR 0050). Safe to run again: a second run changes nothing.
+# Seeds the demo estate (four users in two organizations, and the demo boards) into a running estate, by running the same program the
+# AppHost and compose.yaml run (MiroClone.Seed, ADR 0050 and 0051). Safe to run again: a second run changes nothing.
 # Development only; the program refuses to run in any other environment.
 #
 # Usage: scripts/seed-dev-users.sh [--reset]
@@ -8,7 +8,7 @@
 #   AUTHSERVICE_URL      default http://localhost:5080 (compose). With the AppHost, use the address on the dashboard.
 #   BOARDS_URL           default http://localhost:5081 (compose). With the AppHost, use the address on the dashboard.
 #   CANVAS_URL           default http://localhost:5082 (compose). With the AppHost, use the address on the dashboard.
-#   AUTHSERVICE_CONTAINER   the authservice container, whose log holds the member's invitation token
+#   AUTHSERVICE_CONTAINER   the authservice container, whose log holds the invitation tokens
 #                           (default miroclone-authservice-1 for compose; miroclone-authservice-apphost for the AppHost).
 #   AUTHSERVICE_LOG      a file with authservice's console output, instead of the container.
 #   INVITATION_TOKEN     the invitation token itself, instead of either.

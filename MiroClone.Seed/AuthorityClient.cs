@@ -56,10 +56,10 @@ internal sealed class AuthorityClient(HttpClient http)
         return Guid.Parse((await create.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).GetProperty("id").GetString()!);
     }
 
-    /// <summary>Invites the member. A repeat answers 400 ("already sent") and the earlier invitation still works, so that is not a failure.</summary>
-    public async Task InviteAsync(string ownerToken, Guid organization, string email, CancellationToken cancellationToken)
+    /// <summary>Invites a user with a role (Admin or Member). A repeat answers 400 ("already sent") and the earlier invitation still works, so that is not a failure.</summary>
+    public async Task InviteAsync(string ownerToken, Guid organization, string email, string role, CancellationToken cancellationToken)
     {
-        using var reply = await SendAsync(HttpMethod.Post, $"api/v1/organizations/{organization:D}/invite", ownerToken, new { email, role = "Member" }, cancellationToken);
+        using var reply = await SendAsync(HttpMethod.Post, $"api/v1/organizations/{organization:D}/invite", ownerToken, new { email, role }, cancellationToken);
         if (!reply.IsSuccessStatusCode && (int)reply.StatusCode != 400)
         {
             await EnsureAsync(reply, "invite the member");

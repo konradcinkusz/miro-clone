@@ -11,16 +11,31 @@ namespace MiroClone.Seed;
 internal static class DemoData
 {
     public const string OwnerEmail = "owner@dev.test";
+    public const string AdminEmail = "admin@dev.test";
     public const string MemberEmail = "member@dev.test";
+    public const string OtherEmail = "other@dev.test";
     public const string Password = "Dev-Password-123!"; // gitleaks:allow
     public const string OrganizationName = "Dev Workspace";
+    public const string OtherOrganizationName = "Other Workspace";
     public const string BoardPrefix = "Demo: ";
+    public const string OtherBoardTitle = $"{BoardPrefix}Other workspace board";
 
+    /// <summary>The boards of the first workspace.</summary>
     public static IReadOnlyList<DemoBoard> Boards { get; } =
     [
         new($"{BoardPrefix}Welcome", Welcome()),
         new($"{BoardPrefix}Sprint planning", Planning()),
         new($"{BoardPrefix}Empty board", []),
+    ];
+
+    /// <summary>
+    /// The two workspaces. A user belongs to the organization it created or was invited to, and never to both: the web app uses the
+    /// single organization in the token (ADR 0024), so the second workspace lets a developer try isolation by hand.
+    /// </summary>
+    public static IReadOnlyList<DemoWorkspace> Workspaces { get; } =
+    [
+        new(OrganizationName, [new(OwnerEmail, "Owner"), new(AdminEmail, "Admin"), new(MemberEmail, "Member")], Boards),
+        new(OtherOrganizationName, [new(OtherEmail, "Owner")], [new(OtherBoardTitle, OtherBoard())]),
     ];
 
     public static bool IsDemoBoard(string title) => title.StartsWith(BoardPrefix, StringComparison.Ordinal);
@@ -31,6 +46,12 @@ internal static class DemoData
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes($"miroclone-seed/{name}"));
         return new Guid(hash.AsSpan(0, 16));
     }
+
+    private static DemoLayer[] OtherBoard() =>
+    [
+        Shape("other/frame", "Rectangle", 80, 80, 420, 200, 225, 190, 231),
+        Text("other/note", "Note", 110, 110, 360, 100, 255, 249, 196, "This board belongs to Other Workspace. The Dev Workspace users cannot open it."),
+    ];
 
     private static DemoLayer[] Welcome() =>
     [
@@ -54,6 +75,14 @@ internal static class DemoData
 
     private static DemoLayer Text(string name, string type, double x, double y, double width, double height, byte r, byte g, byte b, string value) =>
         new(LayerId(name), type, x, y, width, height, new DemoColour(r, g, b), value);
+}
+
+internal sealed record DemoUser(string Email, string Role);
+
+/// <summary>An organization: the first user founds it (Owner) and invites the others with their roles.</summary>
+internal sealed record DemoWorkspace(string Name, IReadOnlyList<DemoUser> Users, IReadOnlyList<DemoBoard> Boards)
+{
+    public DemoUser Founder => Users[0];
 }
 
 internal sealed record DemoBoard(string Title, IReadOnlyList<DemoLayer> Layers);

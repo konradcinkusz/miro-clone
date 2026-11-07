@@ -5,8 +5,8 @@ using static Microsoft.Playwright.Assertions;
 namespace MiroClone.Web.E2E.Journeys;
 
 /// <summary>
-/// The demo logins the seed creates (ADR 0050, README "Run it locally"): the owner and the member of the Dev Workspace, and the
-/// demo boards. They run against an estate the seed has run on (compose, or the AppHost in Development), which CI sets with
+/// The demo logins the seed creates (ADR 0050 and 0051, README "Run it locally"): the owner, admin and member of the Dev Workspace,
+/// the owner of the Other Workspace, and the demo boards. They run against an estate the seed has run on (compose, or the AppHost in Development), which CI sets with
 /// MIROCLONE_E2E_SEEDED=1. The estate the suite starts by itself does not run the seed, so there they are skipped with that reason.
 /// </summary>
 [Collection(EstateGroup.Name)]
@@ -15,6 +15,8 @@ public sealed class SeededJourneyTests(EstateFixture stack) : JourneyTests(stack
     // The documented development values (they are published in the README, not secrets). gitleaks:allow
     private static readonly Account Owner = new("owner@dev.test", "Dev-Password-123!"); // gitleaks:allow
     private static readonly Account Member = new("member@dev.test", "Dev-Password-123!"); // gitleaks:allow
+    private static readonly Account Admin = new("admin@dev.test", "Dev-Password-123!"); // gitleaks:allow
+    private static readonly Account Other = new("other@dev.test", "Dev-Password-123!"); // gitleaks:allow
 
     [Fact]
     public async Task TheSeededOwnerSignsInAndSeesTheDemoBoards()
@@ -60,6 +62,60 @@ public sealed class SeededJourneyTests(EstateFixture stack) : JourneyTests(stack
 
         await Expect(member.Page.GetByTestId("layer-rectangle")).ToHaveCountAsync(before + 1);
         // The estate is ephemeral in CI. The rectangle stays on the demo board, and a repeat seed leaves it alone.
+    }
+
+    [Fact]
+    public async Task TheSignInPageHintFillsTheFormAndTheAdminSignsInWithIt()
+    {
+        await RequireSeededAsync();
+        await using var journey = await MiroClone.Web.E2E.Browser.Journey.OpenAsync(Stack);
+        await journey.GoToInteractiveAsync("/sign-in");
+        await journey.WaitForSignInFormAsync();
+
+        // The hint lists every demo login, and one click fills the form (it submits nothing).
+        await Expect(journey.Page.GetByTestId("demo-logins")).ToBeVisibleAsync();
+        await Expect(journey.Page.GetByTestId("demo-login")).ToHaveCountAsync(4);
+        await journey.Page.Locator("[data-testid='demo-login'][data-email='admin@dev.test']").ClickAsync();
+        await Expect(journey.Page.Locator("#sign-in-email")).ToHaveValueAsync(Admin.Email);
+        await Expect(journey.Page.Locator("#sign-in-password")).ToHaveValueAsync(Admin.Password);
+        await Expect(journey.Page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex("/sign-in$"));
+
+        await journey.Page.GetByTestId("sign-in-submit").ClickAsync();
+
+        await Expect(journey.Page.GetByTestId("signed-in-email")).ToHaveTextAsync(Admin.Email);
+        await Expect(journey.Card("Demo: Welcome")).ToBeVisibleAsync();
+    }
+
+    [Fact]
+    public async Task TheSeededAdminSeesTheDevWorkspaceBoardsAndNotTheOtherWorkspacesBoard()
+    {
+        await RequireSeededAsync();
+        await using var journey = await SignedInAsync(Admin);
+
+        await Expect(journey.Card("Demo: Welcome")).ToBeVisibleAsync();
+        await Expect(journey.Card("Demo: Other workspace board")).ToHaveCountAsync(0);
+    }
+
+    [Fact]
+    public async Task TheOtherWorkspaceAndTheDevWorkspaceCannotOpenEachOthersBoards()
+    {
+        await RequireSeededAsync();
+        await using var other = await SignedInAsync(Other);
+        await using var owner = await SignedInAsync(Owner);
+        await Expect(other.Card("Demo: Other workspace board")).ToBeVisibleAsync();
+        await Expect(other.Card("Demo: Welcome")).ToHaveCountAsync(0);
+        await other.Card("Demo: Other workspace board").GetByRole(Microsoft.Playwright.AriaRole.Link).First.ClickAsync();
+        await Expect(other.Page.GetByTestId("board-title")).ToBeVisibleAsync();
+        var otherBoard = other.BoardId();
+        await owner.Card("Demo: Welcome").GetByRole(Microsoft.Playwright.AriaRole.Link).First.ClickAsync();
+        await Expect(owner.Page.GetByTestId("board-title")).ToBeVisibleAsync();
+        var devBoard = owner.BoardId();
+
+        await owner.GoToInteractiveAsync($"/board/{otherBoard}");
+        await other.GoToInteractiveAsync($"/board/{devBoard}");
+
+        await Expect(owner.Page.GetByTestId("board-not-found")).ToBeVisibleAsync();
+        await Expect(other.Page.GetByTestId("board-not-found")).ToBeVisibleAsync();
     }
 
     private async Task RequireSeededAsync()

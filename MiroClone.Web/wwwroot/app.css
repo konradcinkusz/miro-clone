@@ -158,6 +158,14 @@ a:hover {
     margin-top: var(--space-4);
 }
 
+/* The fieldset that holds an account form's controls: no frame, only the disabled state while the form is prerendered (ADR 0051). */
+.form-fieldset {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+}
+
 .cluster {
     display: flex;
     flex-wrap: wrap;

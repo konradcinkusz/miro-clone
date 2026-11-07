@@ -125,6 +125,8 @@ services:
       <<: *authority
       services__boards-service__http__0: http://boards-service:8080
       services__canvas-service__http__0: http://canvas-service:8080
+      # The sign-in page lists the demo logins only in Development with seeding on (ADR 0051); the seed reads the same switch.
+      Seed__Enabled: ${SEED_ENABLED:-true}
       # Sign-ins repeat from one address in the browser journeys; the limit itself is covered by AccountRateLimitingTests.
       RateLimiting__AuthPermitLimit: "1000"
       # The image's user cannot write under /app; the keys live on a volume, as on Fly (ADR 0019).
