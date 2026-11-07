@@ -315,6 +315,10 @@ jobs:
           echo '--- aspire CLI logs ---'; tail -n 120 ~/.aspire/logs/*.log 2>/dev/null || true
           echo '--- verify.log ---'; cat verify.log 2>/dev/null || true
           docker logs miroclone-authservice-apphost 2>&1 | head -n 80 || true
+          echo '--- authservice, last 150 lines (what it did during the journeys) ---'
+          docker logs --tail 150 miroclone-authservice-apphost 2>&1 || true
+          echo '--- apphost.log: errors, warnings and timeouts (web, boards, canvas), without the Aspire housekeeping ---'
+          grep -i -E "fail|error|exception|timeout|timed out|warn" apphost.log | grep -v -E "DefaultHttpClientFactory|V2NamespaceLifecycleWatcher|libgssapi" | tail -n 80 || true
           tail -n 200 apphost.log || true
 
       - name: Stop the AppHost

@@ -100,7 +100,9 @@ public sealed class SeededJourneyTests(EstateFixture stack) : JourneyTests(stack
     public async Task TheOtherWorkspaceAndTheDevWorkspaceCannotOpenEachOthersBoards()
     {
         await RequireSeededAsync();
+        Console.WriteLine("isolation journey: signing in as other@dev.test");
         await using var other = await SignedInAsync(Other);
+        Console.WriteLine("isolation journey: signing in as owner@dev.test");
         await using var owner = await SignedInAsync(Owner);
         await Expect(other.Card("Demo: Other workspace board")).ToBeVisibleAsync();
         await Expect(other.Card("Demo: Welcome")).ToHaveCountAsync(0);
