@@ -28,7 +28,7 @@ public sealed class CircuitWatch : IDisposable
         page.RequestFailed += (_, request) => Note($"request failed: {request.Method} {request.Url}: {request.Failure}");
         page.Response += (_, response) =>
         {
-            if (response.Status >= 400 || (response.Status >= 300 && response.Request.Method != "GET"))
+            if (response.Status >= 300 || response.Request.Method != "GET")
             {
                 Note($"response {response.Status}: {response.Request.Method} {response.Url} location={response.Headers.GetValueOrDefault("location")}");
             }
@@ -42,6 +42,9 @@ public sealed class CircuitWatch : IDisposable
             _events.Add($"{DateTime.UtcNow:HH:mm:ss.fff} {line}");
         }
     }
+
+    /// <summary>What the browser saw so far (redirects, error responses, console), for a failure message.</summary>
+    public string Report() => Describe();
 
     private string Describe()
     {

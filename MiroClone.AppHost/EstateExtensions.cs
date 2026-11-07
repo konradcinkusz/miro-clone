@@ -1,5 +1,6 @@
 using Aspire.Hosting;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Aspire.Hosting.ApplicationModel;
 
 namespace MiroClone.AppHost;
@@ -12,6 +13,11 @@ public static class EstateExtensions
     public const string AuthServiceTag = "v0.3.4";
 
     /// <summary>Issuer and audience of every token the estate accepts (ADR 0011). One audience: authservice mints one per token.</summary>
+    public const string SeedEnabledKey = "Seed:Enabled";
+
+    /// <summary>The authservice container's name under the AppHost. Compose names its own (compose.yaml).</summary>
+    public const string AuthServiceContainerName = "miroclone-authservice-apphost";
+
     public const string TokenIssuer = "MiroClone";
     public const string TokenAudience = "miro-clone";
 
@@ -45,7 +51,9 @@ public static class EstateExtensions
         var authService = builder
             .AddContainer("authservice", AuthServiceImage, AuthServiceTag)
             .WithImageRegistry(AuthServiceRegistry)
-            .WithHttpEndpoint(port: ConfiguredPort(builder, AuthServicePortKey), targetPort: 8080, name: "http")
+            // A fixed name, so the seed can read the dev outbox (the invitation token) from this container's log.
+            .WithContainerName(AuthServiceContainerName)
+            .WithHttpEndpoint(port: AuthServicePort(builder), targetPort: 8080, name: "http")
             .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development")
             .WithEnvironment("ConnectionStrings__DefaultConnection", authDatabase.Resource.ConnectionStringExpression)
             .WithEnvironment("Jwt__Algorithm", "RS256")
@@ -55,12 +63,15 @@ public static class EstateExtensions
             .WaitFor(authDatabase)
             .WithHttpHealthCheck("/health/ready");
 
-        // Its own public origin: the jwks_uri in the discovery document must be reachable by the services (docs/DEPLOYMENT.md).
-        authService.WithEnvironment("Jwt__PublicBaseUrl", AuthorityUrl(authService));
+        // Its own public origin: the jwks_uri in the discovery document must be reachable by the services (docs/DEPLOYMENT.md). The services
+        // run on the host here, so this is the host address and the fixed port, never the container-network name that Aspire resolves for a
+        // container's reference to itself (the first apphost-e2e run: boards answered 401 to a valid token because it could not fetch the keys).
+        authService.WithEnvironment("Jwt__PublicBaseUrl", string.Create(System.Globalization.CultureInfo.InvariantCulture, $"http://localhost:{AuthServicePort(builder)}"));
 
         var canvasService = builder
             .AddProject("canvas-service", ProjectPath(repositoryRoot, "MiroClone.CanvasService"))
-            .WithHttpEndpoint(env: "ASPNETCORE_HTTP_PORTS")
+            .WithHostEnvironment(builder)
+            .WithHttpEndpoint(port: ConfiguredPort(builder, CanvasPortKey), env: "ASPNETCORE_HTTP_PORTS")
             .WithReference(canvasDatabase)
             .WaitFor(canvasDatabase)
             .WithAuthority(authService)
@@ -70,15 +81,22 @@ public static class EstateExtensions
         // and a wait in both directions would be a startup cycle.
         var boardsService = builder
             .AddProject("boards-service", ProjectPath(repositoryRoot, "MiroClone.BoardsService"))
-            .WithHttpEndpoint(env: "ASPNETCORE_HTTP_PORTS")
+            .WithHostEnvironment(builder)
+            .WithHttpEndpoint(port: ConfiguredPort(builder, BoardsPortKey), env: "ASPNETCORE_HTTP_PORTS")
             .WithReference(boardsDatabase)
             .WaitFor(boardsDatabase)
             .WithReference(canvasService)
             .WithAuthority(authService)
             .WithHttpHealthCheck("/health");
 
+        // Canvas asks Boards whether the caller may see a board (BoardsAccessClient, "https+http://boards-service/" through service
+        // discovery). Without this reference the AppHost gave canvas no address for boards and every canvas read answered 503. No WaitFor,
+        // like the edge the other way: a wait in both directions would be a startup cycle. compose.yaml sets Boards__BaseAddress itself.
+        canvasService.WithReference(boardsService);
+
         builder
             .AddProject("web", ProjectPath(repositoryRoot, "MiroClone.Web"))
+            .WithHostEnvironment(builder)
             .WithHttpEndpoint(port: ConfiguredPort(builder, WebPortKey), env: "ASPNETCORE_HTTP_PORTS")
             .WithExternalHttpEndpoints()
             .WithReference(boardsService)
@@ -88,7 +106,49 @@ public static class EstateExtensions
             .WithAuthority(authService)
             .WithHttpHealthCheck("/health");
 
+        if (SeedRequested(builder))
+        {
+            AddSeed(builder, repositoryRoot, authService, boardsService, canvasService);
+        }
+
         return builder;
+    }
+
+    /// <summary>
+    /// The demo seed (ADR 0050): a one-shot project that waits for authservice, boards-service and canvas-service and then creates the
+    /// demo users, organization and boards through their public APIs. It is a resource of Development runs only: with Seed:Enabled
+    /// unset it is on in Development and absent elsewhere, and Seed:Enabled=true outside Development stops the AppHost.
+    /// The web app does not wait for it: the app starts at once, and the seed finishes a few seconds later.
+    /// </summary>
+    private static void AddSeed(
+        IDistributedApplicationBuilder builder,
+        string repositoryRoot,
+        IResourceBuilder<ContainerResource> authService,
+        IResourceBuilder<ProjectResource> boardsService,
+        IResourceBuilder<ProjectResource> canvasService) =>
+        builder
+            .AddProject("seed", ProjectPath(repositoryRoot, "MiroClone.Seed"))
+            .WithHostEnvironment(builder)
+            .WithEnvironment("Seed__AuthServiceUrl", authService.GetEndpoint("http"))
+            .WithEnvironment("Seed__BoardsUrl", boardsService.GetEndpoint("http"))
+            .WithEnvironment("Seed__CanvasUrl", canvasService.GetEndpoint("http"))
+            .WithEnvironment("Seed__AuthServiceContainer", AuthServiceContainerName)
+            .WaitFor(authService)
+            .WaitFor(boardsService)
+            .WaitFor(canvasService);
+
+    /// <summary>On by default in Development, off elsewhere, and an explicit true outside Development is a startup error.</summary>
+    private static bool SeedRequested(IDistributedApplicationBuilder builder)
+    {
+        var configured = builder.Configuration.GetValue<bool?>(SeedEnabledKey);
+        if (!builder.Environment.IsDevelopment())
+        {
+            return configured is true
+                ? throw new InvalidOperationException($"{SeedEnabledKey}=true is refused outside Development ({builder.Environment.EnvironmentName}): the seed creates accounts with published passwords.")
+                : false;
+        }
+
+        return configured ?? true;
     }
 
     /// <summary>
@@ -111,10 +171,28 @@ public static class EstateExtensions
     public const string EphemeralDataKey = "Estate:EphemeralData";
     public const string WebPortKey = "Estate:WebPort";
     public const string AuthServicePortKey = "Estate:AuthServicePort";
+    /// <summary>The host port of authservice when none is configured. The same port compose publishes, so the address in this repository's docs holds for both paths.</summary>
+    public const int DefaultAuthServicePort = 5080;
+
+    public const string BoardsPortKey = "Estate:BoardsPort";
+    public const string CanvasPortKey = "Estate:CanvasPort";
 
     /// <summary>A fixed host port from configuration, or null so Aspire assigns one.</summary>
     private static int? ConfiguredPort(IDistributedApplicationBuilder builder, string key) =>
         builder.Configuration.GetValue<int?>(key);
+
+    /// <summary>
+    /// Gives a project the AppHost's own environment name. Aspire starts projects with <c>--no-launch-profile</c> and does not pass the
+    /// AppHost's environment on, so they ran as Production under a Development AppHost (found by apphost-e2e): the web app then served no
+    /// static web assets (HTTP 500 for its stylesheet and Blazor script) and the seed refused to run. compose.yaml sets Development itself.
+    /// </summary>
+    private static IResourceBuilder<ProjectResource> WithHostEnvironment(this IResourceBuilder<ProjectResource> project, IDistributedApplicationBuilder builder) =>
+        project
+            .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName)
+            .WithEnvironment("DOTNET_ENVIRONMENT", builder.Environment.EnvironmentName);
+
+    private static int AuthServicePort(IDistributedApplicationBuilder builder) =>
+        builder.Configuration.GetValue<int?>(AuthServicePortKey) ?? DefaultAuthServicePort;
 
     private static ReferenceExpression AuthorityUrl(IResourceBuilder<ContainerResource> authService) =>
         ReferenceExpression.Create($"{authService.GetEndpoint("http").Property(EndpointProperty.Url)}");

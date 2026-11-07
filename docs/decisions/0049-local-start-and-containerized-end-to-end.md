@@ -15,7 +15,7 @@ authenticated browser journeys were skipped by default (ADR 0041).
 2. **Launch profiles.** `MiroClone.AppHost/Properties/launchSettings.json` has `http` (default, dashboard 15170, OTLP 19170, unsecured transport allowed)
    and `https` (17170/21170). Without a profile the dashboard and OTLP endpoints are unset and the AppHost prints nothing.
 3. **compose.yaml** mirrors the AppHost wiring (databases, env vars, health-gated start order). The web service sets `DataProtection__KeysPath=/data/keys`
-   on a volume, because the image's user cannot write the default `/app/App_Data/keys`. Aspire's DCP does not run on GitHub runners, so compose is the CI path.
+   on a volume, because the image's user cannot write the default `/app/App_Data/keys`. (ADR 0050 later found that Aspire's DCP does run on a GitHub runner and added `apphost-e2e`; the statement here was wrong.) Compose is the CI path.
 4. **CI.** `compose-e2e` builds the three images, starts the estate, and runs the existing Playwright journeys against it with
    `MIROCLONE_E2E_AUTHENTICATED=1` and `MIROCLONE_E2E_REQUIRED=1`. The required check `pr-validation` is now an aggregate of `unit`, `e2e`, `compose-e2e` and `docker-build`.
 5. **The Web image publishes with a restore.** The first containerized run showed `GET /_framework/blazor.web.js` answering 404: the Dockerfile restored from project files only and then published with `--no-restore`, which leaves out the static web assets (the Blazor client, the stylesheet, the endpoints manifest). The image would have served an unstyled page and no circuit, in Fly as well. The publish no longer uses `--no-restore`.

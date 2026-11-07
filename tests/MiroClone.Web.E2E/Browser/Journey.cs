@@ -55,11 +55,41 @@ public sealed partial class Journey : IAsyncDisposable
         // The account pages are interactive-router pages (ADR 0042): the circuit takes over the form after the server render and
         // replaces what was typed before it connected, so the helper waits for the circuit before it types.
         await GoToInteractiveAsync("/sign-in");
-        await FillFieldAsync("#sign-in-email", account.Email);
-        await FillFieldAsync("#sign-in-password", account.Password);
+        // The circuit's first render can still replace the prerendered form just after it reports ready (a slower estate, such as the Debug-built
+        // AppHost, shows it): a typed value is lost, or a click lands on the element that is being replaced and no POST is sent. So each attempt
+        // fills both fields, confirms them, clicks, and waits a short while for the dashboard; an attempt that changed nothing is repeated.
         var ready = _circuit.ReadyCount;
-        await Page.GetByTestId("sign-in-submit").ClickAsync();
-        await Expect(Page).ToHaveURLAsync(new Regex("/$"));
+        for (var attempt = 1; ; attempt++)
+        {
+            await FillFieldAsync("#sign-in-email", account.Email);
+            await FillFieldAsync("#sign-in-password", account.Password);
+            if (await Page.Locator("#sign-in-email").InputValueAsync() != account.Email
+                || await Page.Locator("#sign-in-password").InputValueAsync() != account.Password)
+            {
+                if (attempt == 4)
+                {
+                    throw new InvalidOperationException($"The sign-in form kept losing what was typed. {_circuit.Report()}");
+                }
+
+                continue;
+            }
+
+            await Page.GetByTestId("sign-in-submit").ClickAsync();
+            try
+            {
+                await Expect(Page).ToHaveURLAsync(new Regex("/$"), new PageAssertionsToHaveURLOptions { Timeout = attempt == 4 ? 15_000 : 6_000 });
+                break;
+            }
+            catch (PlaywrightException error) when (attempt < 4)
+            {
+                Console.WriteLine($"sign-in attempt {attempt} as {account.Email} stayed on {Page.Url}: {error.Message.Split('\n')[0]}");
+            }
+            catch (PlaywrightException error)
+            {
+                throw new InvalidOperationException($"Sign-in as {account.Email} did not reach the dashboard after {attempt} attempts. {_circuit.Report()}", error);
+            }
+        }
+
         await _circuit.WaitForReadyAsync(ready + 1);
         await Expect(Page.GetByTestId("signed-in-email")).ToHaveTextAsync(account.Email);
     }
@@ -93,7 +123,21 @@ public sealed partial class Journey : IAsyncDisposable
     /// <summary>Creates a board from the dashboard and returns its id once the board page shows its title.</summary>
     public async Task<Guid> CreateBoardAsync(string title)
     {
-        await Page.GetByTestId("new-board").Or(Page.GetByTestId("empty-create")).ClickAsync();
+        // A click that lands before the dashboard's interactive render settles opens nothing, so the click is repeated until the title box shows.
+        for (var attempt = 1; ; attempt++)
+        {
+            await Page.GetByTestId("new-board").Or(Page.GetByTestId("empty-create")).ClickAsync();
+            try
+            {
+                await Expect(Page.GetByTestId("board-title-input")).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = attempt == 4 ? 15_000 : 5_000 });
+                break;
+            }
+            catch (PlaywrightException) when (attempt < 4)
+            {
+                Console.WriteLine($"new-board attempt {attempt}: the title box did not open on {Page.Url}");
+            }
+        }
+
         await Page.GetByTestId("board-title-input").FillAsync(title);
         await Page.GetByTestId("board-title-submit").ClickAsync();
         await Expect(Page).ToHaveURLAsync(BoardUrl());

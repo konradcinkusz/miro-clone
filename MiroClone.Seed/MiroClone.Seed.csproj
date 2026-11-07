@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The demo-data seed (ADR 0050): a one-shot console program that creates two users, one organization and a few boards with
+    shapes through the services' public HTTP and SignalR APIs, never through a database. The AppHost runs it as a project
+    resource and compose.yaml as a container, so both paths give the same logins. It references no service project: the
+    wire contracts are restated here, so a contract change breaks the seed's tests, not its build.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>MiroClone.Seed</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
+    <InternalsVisibleTo Include="MiroClone.Seed.Tests" />
+  </ItemGroup>
+
+</Project>

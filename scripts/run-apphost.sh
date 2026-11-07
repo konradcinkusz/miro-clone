@@ -10,4 +10,8 @@ cd "$repo_root"
 
 docker info > /dev/null 2>&1 || { echo "Docker is not running. Start Docker, then run this again." >&2; exit 1; }
 
+# Build the whole estate once first. The AppHost starts the services (and the seed) as `dotnet run` at the same moment, and several
+# builds of the shared ServiceDefaults project at once collide ("GenerateDepsFile ... file in use"), so a service never starts (ADR 0050).
+dotnet build MiroClone.sln --nologo -v quiet
+
 exec dotnet run --project MiroClone.AppHost --launch-profile http "$@"
