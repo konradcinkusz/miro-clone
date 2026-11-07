@@ -100,24 +100,33 @@ public sealed class SeededJourneyTests(EstateFixture stack) : JourneyTests(stack
     public async Task TheOtherWorkspaceAndTheDevWorkspaceCannotOpenEachOthersBoards()
     {
         await RequireSeededAsync();
-        Console.WriteLine("isolation journey: signing in as other@dev.test");
-        await using var other = await SignedInAsync(Other);
-        Console.WriteLine("isolation journey: signing in as owner@dev.test");
-        await using var owner = await SignedInAsync(Owner);
-        await Expect(other.Card("Demo: Other workspace board")).ToBeVisibleAsync();
-        await Expect(other.Card("Demo: Welcome")).ToHaveCountAsync(0);
-        await other.Card("Demo: Other workspace board").GetByRole(Microsoft.Playwright.AriaRole.Link).First.ClickAsync();
-        await Expect(other.Page.GetByTestId("board-title")).ToBeVisibleAsync();
-        var otherBoard = other.BoardId();
-        await owner.Card("Demo: Welcome").GetByRole(Microsoft.Playwright.AriaRole.Link).First.ClickAsync();
-        await Expect(owner.Page.GetByTestId("board-title")).ToBeVisibleAsync();
-        var devBoard = owner.BoardId();
 
-        await owner.GoToInteractiveAsync($"/board/{otherBoard}");
-        await other.GoToInteractiveAsync($"/board/{devBoard}");
+        // One browser at a time: the journeys sign in one after the other, so the slower AppHost estate never serves two sign-ins that overlap.
+        Guid otherBoard, devBoard;
+        await using (var other = await SignedInAsync(Other))
+        {
+            await Expect(other.Card("Demo: Other workspace board")).ToBeVisibleAsync();
+            await Expect(other.Card("Demo: Welcome")).ToHaveCountAsync(0);
+            await other.Card("Demo: Other workspace board").GetByRole(Microsoft.Playwright.AriaRole.Link).First.ClickAsync();
+            await Expect(other.Page.GetByTestId("board-title")).ToBeVisibleAsync();
+            otherBoard = other.BoardId();
+        }
 
-        await Expect(owner.Page.GetByTestId("board-not-found")).ToBeVisibleAsync();
-        await Expect(other.Page.GetByTestId("board-not-found")).ToBeVisibleAsync();
+        await using (var owner = await SignedInAsync(Owner))
+        {
+            await owner.Card("Demo: Welcome").GetByRole(Microsoft.Playwright.AriaRole.Link).First.ClickAsync();
+            await Expect(owner.Page.GetByTestId("board-title")).ToBeVisibleAsync();
+            devBoard = owner.BoardId();
+
+            await owner.GoToInteractiveAsync($"/board/{otherBoard}");
+            await Expect(owner.Page.GetByTestId("board-not-found")).ToBeVisibleAsync();
+        }
+
+        await using (var other = await SignedInAsync(Other))
+        {
+            await other.GoToInteractiveAsync($"/board/{devBoard}");
+            await Expect(other.Page.GetByTestId("board-not-found")).ToBeVisibleAsync();
+        }
     }
 
     private async Task RequireSeededAsync()
