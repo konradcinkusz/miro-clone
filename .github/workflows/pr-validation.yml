@@ -322,6 +322,11 @@ jobs:
           echo '--- web, boards and canvas process output (Aspire/DCP log files written during this job) ---'
           find / -xdev -type f -mmin -40 \( -iname '*web*' -o -iname '*boards*' -o -iname '*canvas*' \) \( -iname '*out*' -o -iname '*err*' -o -iname '*.log' \) -not -path '*/proc/*' -not -path '*/node_modules/*' -not -path '*/.nuget/*' -not -path '*/work/miro-clone/*' 2>/dev/null | head -n 12 | while read -r f; do echo "== $f"; tail -n 120 "$f"; done || true
           echo '--- docker stats ---'; docker stats --no-stream 2>&1 || true
+          echo '--- web resource log through the Aspire CLI (the AppHost is still running) ---'
+          aspire_cli="$(ls ~/.nuget/packages/aspire.cli.linux-x64/*/tools/net10.0/linux-x64/aspire 2>/dev/null | head -n 1)"
+          if [ -n "$aspire_cli" ]; then
+            ( cd MiroClone.AppHost && timeout 40 "$aspire_cli" logs web --no-follow 2>&1 | tail -n 150 ) || true
+          fi
           tail -n 200 apphost.log || true
 
       - name: Stop the AppHost
