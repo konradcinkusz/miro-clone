@@ -70,6 +70,7 @@ public static class EstateExtensions
 
         var canvasService = builder
             .AddProject("canvas-service", ProjectPath(repositoryRoot, "MiroClone.CanvasService"))
+            .WithHostEnvironment(builder)
             .WithHttpEndpoint(port: ConfiguredPort(builder, CanvasPortKey), env: "ASPNETCORE_HTTP_PORTS")
             .WithReference(canvasDatabase)
             .WaitFor(canvasDatabase)
@@ -80,6 +81,7 @@ public static class EstateExtensions
         // and a wait in both directions would be a startup cycle.
         var boardsService = builder
             .AddProject("boards-service", ProjectPath(repositoryRoot, "MiroClone.BoardsService"))
+            .WithHostEnvironment(builder)
             .WithHttpEndpoint(port: ConfiguredPort(builder, BoardsPortKey), env: "ASPNETCORE_HTTP_PORTS")
             .WithReference(boardsDatabase)
             .WaitFor(boardsDatabase)
@@ -94,6 +96,7 @@ public static class EstateExtensions
 
         builder
             .AddProject("web", ProjectPath(repositoryRoot, "MiroClone.Web"))
+            .WithHostEnvironment(builder)
             .WithHttpEndpoint(port: ConfiguredPort(builder, WebPortKey), env: "ASPNETCORE_HTTP_PORTS")
             .WithExternalHttpEndpoints()
             .WithReference(boardsService)
@@ -125,6 +128,7 @@ public static class EstateExtensions
         IResourceBuilder<ProjectResource> canvasService) =>
         builder
             .AddProject("seed", ProjectPath(repositoryRoot, "MiroClone.Seed"))
+            .WithHostEnvironment(builder)
             .WithEnvironment("Seed__AuthServiceUrl", authService.GetEndpoint("http"))
             .WithEnvironment("Seed__BoardsUrl", boardsService.GetEndpoint("http"))
             .WithEnvironment("Seed__CanvasUrl", canvasService.GetEndpoint("http"))
@@ -176,6 +180,16 @@ public static class EstateExtensions
     /// <summary>A fixed host port from configuration, or null so Aspire assigns one.</summary>
     private static int? ConfiguredPort(IDistributedApplicationBuilder builder, string key) =>
         builder.Configuration.GetValue<int?>(key);
+
+    /// <summary>
+    /// Gives a project the AppHost's own environment name. Aspire starts projects with <c>--no-launch-profile</c> and does not pass the
+    /// AppHost's environment on, so they ran as Production under a Development AppHost (found by apphost-e2e): the web app then served no
+    /// static web assets (HTTP 500 for its stylesheet and Blazor script) and the seed refused to run. compose.yaml sets Development itself.
+    /// </summary>
+    private static IResourceBuilder<ProjectResource> WithHostEnvironment(this IResourceBuilder<ProjectResource> project, IDistributedApplicationBuilder builder) =>
+        project
+            .WithEnvironment("ASPNETCORE_ENVIRONMENT", builder.Environment.EnvironmentName)
+            .WithEnvironment("DOTNET_ENVIRONMENT", builder.Environment.EnvironmentName);
 
     private static int AuthServicePort(IDistributedApplicationBuilder builder) =>
         builder.Configuration.GetValue<int?>(AuthServicePortKey) ?? DefaultAuthServicePort;

@@ -41,6 +41,11 @@ Aspire's DCP **does run on a GitHub-hosted runner** (ubuntu): the AppHost starte
 The experiment found a real defect: the AppHost starts the services and the seed as parallel `dotnet run` builds, which collide on the shared
 `ServiceDefaults` deps file (`MSB4018 GenerateDepsFile ... file in use`) and leave a service unstarted. `scripts/run-apphost.sh` and the CI job build the solution once first.
 
+Further defects the same job found, all fixed here: the AppHost gave authservice a container-network address as `Jwt__PublicBaseUrl`, so the host-run services could not
+fetch its keys (now `http://localhost:5080`); it gave canvas no reference to boards, so every canvas read answered 503; and it started every project as **Production**
+whatever its own environment (Aspire passes `--no-launch-profile` and does not forward the environment), so the web app served HTTP 500 for its stylesheet and Blazor script
+and the seed refused to run. `EstateExtensions.WithHostEnvironment` now passes the AppHost's environment name to each project.
+
 ## Consequences
 
 - Every start of the estate yields the same two logins. The seed is a Development tool and ships in no deployment: no Fly config mentions it, and the production images are unchanged.

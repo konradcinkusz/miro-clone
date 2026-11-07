@@ -52,6 +52,30 @@ public sealed class SeedWiringTests
     }
 
     [Fact]
+    public async Task EveryProjectRunsInTheEnvironmentOfTheAppHost()
+    {
+        foreach (var environmentName in new[] { "Development", "Staging" })
+        {
+            var projects = Build($"--environment={environmentName}").Resources.OfType<ProjectResource>().ToArray();
+
+            Assert.NotEmpty(projects);
+            foreach (var project in projects)
+            {
+                var executionContext = new DistributedApplicationExecutionContext(
+                    new DistributedApplicationExecutionContextOptions(DistributedApplicationOperation.Run));
+                var context = new EnvironmentCallbackContext(executionContext, resource: project);
+                foreach (var callback in project.Annotations.OfType<EnvironmentCallbackAnnotation>())
+                {
+                    await callback.Callback(context);
+                }
+
+                Assert.Equal(environmentName, context.EnvironmentVariables["ASPNETCORE_ENVIRONMENT"]);
+                Assert.Equal(environmentName, context.EnvironmentVariables["DOTNET_ENVIRONMENT"]);
+            }
+        }
+    }
+
+    [Fact]
     public void NoServiceWaitsForTheSeedSoTheAppStartsAtOnce()
     {
         var model = Build("--environment=Development");

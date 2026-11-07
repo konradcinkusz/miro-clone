@@ -62,6 +62,18 @@ data each store holds are in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 Docker pulls `postgres:18.3` from Docker Hub and `ghcr.io/konradcinkusz/authservice:v0.3.4` from GitHub, so both registries must be reachable.
 No secret has to be created: the authservice signing key is generated for you and kept outside the repository.
 
+**Demo logins (seeded on every start, both paths):** the seed runs once the services are healthy and is safe to repeat.
+
+| Who | Email | Password |
+|---|---|---|
+| Owner | `owner@dev.test` | `Dev-Password-123!` |
+| Member | `member@dev.test` | `Dev-Password-123!` |
+
+Both belong to the `Dev Workspace` organization and see the boards `Demo: Welcome`, `Demo: Sprint planning` and `Demo: Empty board`. Sign in as one
+in one browser and as the other in a second browser to watch a board live. These are development-only values, not secrets
+(`gitleaks:allow`); the seed runs only in Development. Switch it off with `-- --Seed:Enabled=false` (AppHost) or `SEED_ENABLED=false` (compose);
+re-run or reset it with `scripts/seed-dev-users.sh [--reset]`; check it with `scripts/verify-seed.sh`. Details: [docs/AUTH.md](docs/AUTH.md), [ADR 0050](docs/decisions/0050-the-estate-seeds-demo-data-through-its-public-apis.md).
+
 **Path 1, the Aspire AppHost (developer path), one command:**
 
 ```bash
@@ -84,18 +96,6 @@ docker compose down -v          # stop and delete the data
 ```
 
 Web <http://localhost:8080>, authservice <http://localhost:5080>. This is the path CI runs the browser journeys against.
-
-**Demo logins (seeded on every start, both paths):** the seed runs once the services are healthy and is safe to repeat.
-
-| Who | Email | Password |
-|---|---|---|
-| Owner | `owner@dev.test` | `Dev-Password-123!` |
-| Member | `member@dev.test` | `Dev-Password-123!` |
-
-Both belong to the `Dev Workspace` organization and see the boards `Demo: Welcome`, `Demo: Sprint planning` and `Demo: Empty board`. Sign in as one
-in one browser and as the other in a second browser to watch a board live. These are development-only values, not secrets
-(`gitleaks:allow`); the seed runs only in Development. Switch it off with `-- --Seed:Enabled=false` (AppHost) or `SEED_ENABLED=false` (compose);
-re-run or reset it with `scripts/seed-dev-users.sh [--reset]`; check it with `scripts/verify-seed.sh`. Details: [docs/AUTH.md](docs/AUTH.md), [ADR 0050](docs/decisions/0050-the-estate-seeds-demo-data-through-its-public-apis.md).
 
 **Path 3, no AppHost (fallback):** `scripts/run-local-stack.sh` starts PostgreSQL and authservice in Docker and the three services as plain
 processes; logs go to `.local/logs/`. Web <http://localhost:8080>.

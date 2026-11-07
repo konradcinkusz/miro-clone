@@ -28,7 +28,13 @@ try
     var result = await seeder.RunAsync(settings.Reset, cancellation.Token);
     Console.WriteLine(
         $"seed: done. organization {result.Organization}; registered {result.UsersRegistered}, boards created {result.BoardsCreated}, shapes added {result.LayersAdded}, boards removed {result.BoardsRemoved}.");
-    Console.WriteLine($"seed: sign in as {DemoData.OwnerEmail} or {DemoData.MemberEmail} (development password, see the README).");
+    Console.WriteLine();
+    Console.WriteLine("seed: ============================ DEMO LOGINS (development only) ============================");
+    Console.WriteLine($"seed:   {"owner",-8} {DemoData.OwnerEmail,-18} {DemoData.Password}   owner of '{DemoData.OrganizationName}'");
+    Console.WriteLine($"seed:   {"member",-8} {DemoData.MemberEmail,-18} {DemoData.Password}   member of '{DemoData.OrganizationName}'");
+    Console.WriteLine($"seed:   boards: {string.Join(", ", DemoData.Boards.Select(board => board.Title))}");
+    Console.WriteLine("seed:   sign in as one in each of two browsers to edit a board together live.");
+    Console.WriteLine("seed: ========================================================================================");
     return 0;
 }
 catch (SeedException error)
