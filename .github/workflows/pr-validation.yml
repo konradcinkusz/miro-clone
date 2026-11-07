@@ -238,10 +238,11 @@ jobs:
       - name: Build the estate once (Debug, as the AppHost runs it)
         run: dotnet build MiroClone.sln --nologo -v quiet
 
+        # Sign-ins in the journeys repeat from one address: raise the auth limit as compose.yaml does (the limit itself is covered by AccountRateLimitingTests).
       - name: Start the AppHost (http launch profile, Development, seed on)
         run: |
           key="$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048)"
-          nohup env DOTNET_ENVIRONMENT=Development ASPNETCORE_ENVIRONMENT=Development "Parameters__authservice-jwt-private-key=$key" Estate__WebPort=8080 Estate__AuthServicePort=5080 Estate__BoardsPort=5081 Estate__CanvasPort=5082 Estate__EphemeralData=true \
+          nohup env DOTNET_ENVIRONMENT=Development ASPNETCORE_ENVIRONMENT=Development "Parameters__authservice-jwt-private-key=$key" Estate__WebPort=8080 Estate__AuthServicePort=5080 Estate__BoardsPort=5081 Estate__CanvasPort=5082 Estate__EphemeralData=true RateLimiting__AuthPermitLimit=1000 \
             dotnet run --project MiroClone.AppHost > apphost.log 2>&1 &
           echo $! > apphost.pid
           deadline=$((SECONDS + 420))
