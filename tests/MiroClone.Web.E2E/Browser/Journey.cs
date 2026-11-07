@@ -59,9 +59,9 @@ public sealed partial class Journey : IAsyncDisposable
         var ready = _circuit.ReadyCount;
         await FillFieldAsync("#sign-in-email", account.Email);
         await FillFieldAsync("#sign-in-password", account.Password);
-        // The first sign-in on a cold, Debug-built AppHost can take longer than the click's own 30 s navigation wait (apphost-e2e), so the
-        // click does not wait for the navigation and the address is awaited with an explicit, longer bound.
-        await Page.GetByTestId("sign-in-submit").ClickAsync(new LocatorClickOptions { NoWaitAfter = true });
+        // The first sign-in on a cold, Debug-built AppHost can take longer than the click's default 30 s wait for the navigation it starts
+        // (apphost-e2e), so the click gets an explicit, longer bound.
+        await Page.GetByTestId("sign-in-submit").ClickAsync(new LocatorClickOptions { Timeout = 90_000 });
         await Expect(Page).ToHaveURLAsync(new Regex("/$"), new PageAssertionsToHaveURLOptions { Timeout = 60_000 });
         await _circuit.WaitForReadyAsync(ready + 1);
         await Expect(Page.GetByTestId("signed-in-email")).ToHaveTextAsync(account.Email);
