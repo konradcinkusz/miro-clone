@@ -128,7 +128,7 @@ jobs:
 
   # The estate in containers, built from the Dockerfiles and started by compose.yaml (the same wiring as the AppHost), then the
   # browser journeys against it: register through authservice, sign in, create a board, draw, and a second user in the same
-  # workspace sees the live shape and cursor (ADR 0049). Aspire's DCP does not run on GitHub runners, which is why compose is used.
+  # workspace sees the live shape and cursor (ADR 0049). This job drives the compose path; apphost-e2e below drives the AppHost path (ADR 0050).
   compose-e2e:
     name: compose-e2e (containers and browser)
     runs-on: ubuntu-latest
@@ -208,14 +208,12 @@ jobs:
         run: docker compose down -v
 
   # The Aspire path itself: the AppHost starts on the runner (Development, so it seeds), then the same checks and the seeded journeys run
-  # against it. Earlier findings said Aspire's DCP does not run on GitHub runners (ADR 0049); this job is the experiment that checks
-  # the claim and, where it holds, the proof of the AppHost path. It is not part of the required aggregate until the result is recorded
-  # in ADR 0050, so a DCP failure shows as this job's own red or amber and never as a skipped test.
+  # against it. Aspire's DCP does run on a GitHub-hosted runner (ADR 0050 corrects ADR 0049), so this is a required job: it proves the real
+  # authservice container, the seed and the browser journeys under the AppHost, not only under compose.
   apphost-e2e:
     name: apphost-e2e (Aspire AppHost and browser)
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    continue-on-error: true
     env:
       MIROCLONE_E2E_REQUIRED: "1"
       MIROCLONE_E2E_AUTHENTICATED: "1"
@@ -329,7 +327,7 @@ jobs:
   pr-validation:
     name: pr-validation
     runs-on: ubuntu-latest
-    needs: [unit, e2e, compose-e2e, docker-build]
+    needs: [unit, e2e, compose-e2e, apphost-e2e, docker-build]
     if: always()
     steps:
       - name: Every job succeeded
@@ -338,4 +336,5 @@ jobs:
           test "${{ needs.unit.result }}" = success
           test "${{ needs.e2e.result }}" = success
           test "${{ needs.compose-e2e.result }}" = success
+          test "${{ needs.apphost-e2e.result }}" = success
           test "${{ needs.docker-build.result }}" = success

@@ -1,6 +1,6 @@
 # The whole estate in containers, mirroring MiroClone.AppHost (EstateExtensions): the same databases, environment variables and
 # start order (depends_on + healthchecks stand in for WaitFor). This is the CI path of the containerized end-to-end job and a
-# second way to run the estate locally, because Aspire's DCP orchestrator does not run on GitHub runners (ADR 0049).
+# second way to run the estate locally, as the container-only way to run the estate; CI proves both this path and the AppHost path (ADR 0049, ADR 0050).
 # Development settings only: plain http on localhost, a throwaway database password, a signing key supplied by the caller.
 #
 #   scripts/compose-up.sh        # generates a signing key in .local/ (gitignored) and runs `docker compose up --build --wait`
