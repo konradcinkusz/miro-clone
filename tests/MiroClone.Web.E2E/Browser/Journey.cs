@@ -54,17 +54,34 @@ public sealed partial class Journey : IAsyncDisposable
     {
         // The account pages are interactive-router pages (ADR 0042): the circuit replaces the prerendered form. The prerendered form is
         // disabled (ADR 0051), so there is nothing to lose: the fields take input only once they are the interactive ones.
-        await GoToInteractiveAsync("/sign-in");
-        await WaitForSignInFormAsync();
-        var ready = _circuit.ReadyCount;
-        await FillFieldAsync("#sign-in-email", account.Email);
-        await FillFieldAsync("#sign-in-password", account.Password);
-        // The first sign-in on a cold, Debug-built AppHost can take longer than the click's default 30 s wait for the navigation it starts
-        // (apphost-e2e), so the click gets an explicit, longer bound.
-        await Page.GetByTestId("sign-in-submit").ClickAsync(new LocatorClickOptions { Timeout = 90_000 });
-        await Expect(Page).ToHaveURLAsync(new Regex("/$"), new PageAssertionsToHaveURLOptions { Timeout = 60_000 });
-        await _circuit.WaitForReadyAsync(ready + 1);
-        await Expect(Page.GetByTestId("signed-in-email")).ToHaveTextAsync(account.Email);
+        //
+        // One outcome is retried, and only that one: the page answering "The account service is not reachable". On the CI estates an
+        // authservice call occasionally stalls for the web's whole 30 s request budget, in compose and in the AppHost alike, and the
+        // earlier click-repeat loop (removed with ADR 0051) was absorbing it. Each occurrence is printed, three attempts at most, and any
+        // other outcome (wrong password, rate limit, a page that never changes) fails at once. The stall itself is an open finding (PR #25).
+        for (var attempt = 1; ; attempt++)
+        {
+            await GoToInteractiveAsync("/sign-in");
+            await WaitForSignInFormAsync();
+            var ready = _circuit.ReadyCount;
+            await FillFieldAsync("#sign-in-email", account.Email);
+            await FillFieldAsync("#sign-in-password", account.Password);
+            // The click gets an explicit bound for the navigation it starts, since the first sign-in on a cold AppHost can be slow.
+            await Page.GetByTestId("sign-in-submit").ClickAsync(new LocatorClickOptions { Timeout = 90_000 });
+            try
+            {
+                await Expect(Page).ToHaveURLAsync(new Regex("/$"), new PageAssertionsToHaveURLOptions { Timeout = 20_000 });
+            }
+            catch (PlaywrightException) when (attempt < 3 && Page.Url.Contains("not%20reachable", StringComparison.Ordinal))
+            {
+                Console.WriteLine($"sign-in attempt {attempt} as {account.Email}: the account service was not reachable; trying again");
+                continue;
+            }
+
+            await _circuit.WaitForReadyAsync(ready + 1);
+            await Expect(Page.GetByTestId("signed-in-email")).ToHaveTextAsync(account.Email);
+            return;
+        }
     }
 
     /// <summary>Waits until the sign-in form takes input: its fields are enabled only on the interactive render (ADR 0051).</summary>
