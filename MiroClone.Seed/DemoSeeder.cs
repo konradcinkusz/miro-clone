@@ -1,12 +1,12 @@
 namespace MiroClone.Seed;
 
 /// <summary>What one run did, for the log and for the tests.</summary>
-internal sealed record SeedResult(Guid Organization, int UsersRegistered, int BoardsCreated, int LayersAdded, int BoardsRemoved);
+internal sealed record SeedResult(IReadOnlyDictionary<string, Guid> Organizations, int UsersRegistered, int BoardsCreated, int LayersAdded, int BoardsRemoved);
 
 /// <summary>
-/// Creates the demo estate through the services' APIs, in an order that makes a second run a no-op: sign in (register only when
-/// sign-in is refused), find the organization by name, bring the member in only when the member's token lacks it, find each board by
-/// its title, add only the layers whose ids are missing.
+/// Creates the demo estate through the services' APIs, in an order that makes a second run a no-op: sign in every user (register only when
+/// sign-in is refused), per workspace find the organization by name, invite a user only when the user's token lacks it, find each board by
+/// its title, add only the layers whose ids are missing. Two workspaces: a user belongs to exactly one.
 /// </summary>
 internal sealed class DemoSeeder(
     AuthorityClient authority,
@@ -17,69 +17,105 @@ internal sealed class DemoSeeder(
 {
     private static readonly TimeSpan InvitationWait = TimeSpan.FromSeconds(30);
 
+    // Tokens already accepted: authservice prints one per invitation, and the outbox shows them all, so the next one is the first not in here.
+    private readonly HashSet<string> _usedInvitations = [];
+
     public async Task<SeedResult> RunAsync(bool reset, CancellationToken cancellationToken)
     {
-        var owner = await authority.SignInOrRegisterAsync(DemoData.OwnerEmail, DemoData.Password, cancellationToken);
-        var member = await authority.SignInOrRegisterAsync(DemoData.MemberEmail, DemoData.Password, cancellationToken);
-
-        var organization = await authority.EnsureOrganizationAsync(owner, DemoData.OrganizationName, cancellationToken);
-        log($"organization '{DemoData.OrganizationName}' is {organization}");
-
-        if (!AuthorityClient.OrganizationsOf(member).Contains(organization))
+        var organizations = new Dictionary<string, Guid>();
+        int created = 0, layers = 0, removed = 0;
+        foreach (var workspace in DemoData.Workspaces)
         {
-            await authority.InviteAsync(owner, organization, DemoData.MemberEmail, cancellationToken);
-            var invitation = await WaitForInvitationAsync(cancellationToken);
-            await authority.AcceptInvitationAsync(member, invitation, cancellationToken);
-            log($"{DemoData.MemberEmail} joined the organization");
+            var (organization, token) = await EnsureWorkspaceAsync(workspace, cancellationToken);
+            organizations[workspace.Name] = organization;
+            var (c, l, r) = await SeedBoardsAsync(workspace, token, reset, cancellationToken);
+            created += c;
+            layers += l;
+            removed += r;
         }
 
-        // A membership reaches a token only when the token is issued, so both sign in again.
-        owner = await authority.SignInOrRegisterAsync(DemoData.OwnerEmail, DemoData.Password, cancellationToken);
-        member = await authority.SignInOrRegisterAsync(DemoData.MemberEmail, DemoData.Password, cancellationToken);
-        if (!AuthorityClient.OrganizationsOf(member).SequenceEqual([organization]) || !AuthorityClient.OrganizationsOf(owner).SequenceEqual([organization]))
+        return new SeedResult(organizations, authority.Registrations, created, layers, removed);
+    }
+
+    /// <summary>Creates the organization and brings every other user in with their role. Returns the organization and the founder's fresh token.</summary>
+    private async Task<(Guid Organization, string FounderToken)> EnsureWorkspaceAsync(DemoWorkspace workspace, CancellationToken cancellationToken)
+    {
+        var tokens = new Dictionary<string, string>();
+        foreach (var user in workspace.Users)
         {
-            throw new SeedException($"The demo users must belong to exactly the organization {organization}; their tokens say otherwise. Is the authservice database shared with other data?");
+            tokens[user.Email] = await authority.SignInOrRegisterAsync(user.Email, DemoData.Password, cancellationToken);
         }
 
+        var organization = await authority.EnsureOrganizationAsync(tokens[workspace.Founder.Email], workspace.Name, cancellationToken);
+        log($"organization '{workspace.Name}' is {organization}");
+
+        foreach (var user in workspace.Users.Skip(1).Where(user => !AuthorityClient.OrganizationsOf(tokens[user.Email]).Contains(organization)))
+        {
+            await authority.InviteAsync(tokens[workspace.Founder.Email], organization, user.Email, user.Role, cancellationToken);
+            var invitation = await WaitForInvitationAsync(user.Email, cancellationToken);
+            await authority.AcceptInvitationAsync(tokens[user.Email], invitation, cancellationToken);
+            _usedInvitations.Add(invitation);
+            log($"{user.Email} joined as {user.Role}");
+        }
+
+        // A membership reaches a token only when the token is issued, and that includes the founder's own: everyone signs in again.
+        foreach (var user in workspace.Users)
+        {
+            tokens[user.Email] = await authority.SignInOrRegisterAsync(user.Email, DemoData.Password, cancellationToken);
+        }
+
+        foreach (var user in workspace.Users)
+        {
+            if (!AuthorityClient.OrganizationsOf(tokens[user.Email]).SequenceEqual([organization]))
+            {
+                throw new SeedException($"{user.Email} must belong to exactly the organization {organization} ({workspace.Name}); its token says otherwise. Is the authservice database shared with other data?");
+            }
+        }
+
+        return (organization, tokens[workspace.Founder.Email]);
+    }
+
+    private async Task<(int Created, int Layers, int Removed)> SeedBoardsAsync(DemoWorkspace workspace, string token, bool reset, CancellationToken cancellationToken)
+    {
         var removed = 0;
-        var existing = await boards.ListAsync(owner, cancellationToken);
+        var existing = await boards.ListAsync(token, cancellationToken);
         if (reset)
         {
             foreach (var (id, title) in existing.Where(board => DemoData.IsDemoBoard(board.Title)))
             {
-                await boards.DeleteAsync(owner, id, cancellationToken);
+                await boards.DeleteAsync(token, id, cancellationToken);
                 removed++;
-                log($"removed demo board '{title}'");
+                log($"removed demo board '{title}' of '{workspace.Name}'");
             }
 
             existing = [.. existing.Where(board => !DemoData.IsDemoBoard(board.Title))];
         }
 
         int created = 0, layers = 0;
-        foreach (var demo in DemoData.Boards)
+        foreach (var demo in workspace.Boards)
         {
             var match = existing.FirstOrDefault(board => board.Title == demo.Title);
             var id = match.Id;
             if (id == Guid.Empty)
             {
-                id = await boards.CreateAsync(owner, demo.Title, cancellationToken);
+                id = await boards.CreateAsync(token, demo.Title, cancellationToken);
                 created++;
             }
 
-            var added = await canvas.EnsureLayersAsync(owner, id, demo.Layers, cancellationToken);
+            var added = await canvas.EnsureLayersAsync(token, id, demo.Layers, cancellationToken);
             layers += added;
             log($"board '{demo.Title}' {id}: {(match.Id == Guid.Empty ? "created" : "present")}, {added} shapes added");
         }
 
-        return new SeedResult(organization, authority.Registrations, created, layers, removed);
+        return (created, layers, removed);
     }
 
-    private async Task<string> WaitForInvitationAsync(CancellationToken cancellationToken)
+    private async Task<string> WaitForInvitationAsync(string email, CancellationToken cancellationToken)
     {
         var deadline = DateTimeOffset.UtcNow + InvitationWait;
         do
         {
-            if (await invitations.NewestAsync(cancellationToken) is { } token)
+            if (await invitations.NewestAsync(cancellationToken) is { } token && !_usedInvitations.Contains(token))
             {
                 return token;
             }
@@ -89,7 +125,8 @@ internal sealed class DemoSeeder(
         while (DateTimeOffset.UtcNow < deadline);
 
         throw new SeedException(
-            $"The invitation for {DemoData.MemberEmail} was sent, but its token was not found. authservice writes it to its console (\"Invitation token:\"). "
-            + "Give the seed a way to read it: mount the Docker socket and set Seed__AuthServiceContainer, or set Seed__AuthServiceLogFile or Seed__InvitationToken.");
+            $"The invitation for {email} was sent, but a new token was not found. authservice writes it to its console (\"Invitation token:\"). "
+            + "Give the seed a way to read it: mount the Docker socket and set Seed__AuthServiceContainer, or set Seed__AuthServiceLogFile. "
+            + "Seed__InvitationToken holds one token only, so it serves a single invitation.");
     }
 }

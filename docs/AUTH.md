@@ -57,19 +57,26 @@ them (fail closed, ADR 0011). Choosing an active workspace needs an authservice 
    container) and `scripts/run-local-stack.sh` do it through the same program, `MiroClone.Seed`. It talks to the public APIs only, never to
    a database, and a second run changes nothing.
 
-   | Who | Email | Password | Role |
-   |---|---|---|---|
-   | Owner | `owner@dev.test` | `Dev-Password-123!` | Owner of the `Dev Workspace` organization |
-   | Member | `member@dev.test` | `Dev-Password-123!` | Member of the same organization |
+   | Who | Email | Password | Role | Organization |
+   |---|---|---|---|---|
+   | Owner | `owner@dev.test` | `Dev-Password-123!` | Owner | `Dev Workspace` |
+   | Admin | `admin@dev.test` | `Dev-Password-123!` | Admin | `Dev Workspace` |
+   | Member | `member@dev.test` | `Dev-Password-123!` | Member | `Dev Workspace` |
+   | Other | `other@dev.test` | `Dev-Password-123!` | Owner | `Other Workspace` |
 
    These are published development values, not secrets: they satisfy authservice's password rule and exist only on your machine. The
-   seed refuses to run unless `ASPNETCORE_ENVIRONMENT=Development`. It creates three boards whose titles start with `Demo: `
-   (`Welcome` and `Sprint planning` with shapes, and an empty one). That prefix, the `dev.test` addresses, the organization name and
-   layer ids derived from fixed names are the seed's namespace: `--reset` removes only boards in it.
+   seed refuses to run unless `ASPNETCORE_ENVIRONMENT=Development`. It creates three boards whose titles start with `Demo: ` in the
+   `Dev Workspace` (`Welcome` and `Sprint planning` with shapes, and an empty one) and `Demo: Other workspace board` in the `Other Workspace`.
+   That prefix, the `dev.test` addresses, the organization names and layer ids derived from fixed names are the seed's namespace: `--reset`
+   removes only boards in it. The admin and the member are invited by the owner with their role (`Admin`, `Member`) and accept; the other
+   user founds its own organization. **No user is in both organizations**, because the web app uses the single organization in the token
+   (ADR 0024, above), so the two workspaces show isolation: the other workspace's board answers "Board not found", never "forbidden".
+   Roles: Owner and Admin see "Invite members" on the dashboard; Member does not.
+   The sign-in page shows the four logins with a one-click fill, only in Development with `Seed:Enabled` true (ADR 0051).
 
    - Switch it off: `dotnet run --project MiroClone.AppHost -- --Seed:Enabled=false`, or `SEED_ENABLED=false scripts/compose-up.sh`.
    - Run it by hand against a running estate, or reset the demo boards: `scripts/seed-dev-users.sh [--reset]`. Check it: `scripts/verify-seed.sh`.
-   - The member's invitation token is not returned by authservice. Its dev outbox prints it to the container's console, and the seed
+   - Each invitation token (admin, member) is not returned by authservice. Its dev outbox prints it to the container's console, and the seed
      reads it from there over the Docker socket (`Seed__AuthServiceContainer`; compose mounts the socket into the seed container, which is
      why that container runs as root). Without a Docker socket set `Seed__AuthServiceLogFile` or `Seed__InvitationToken`.
 

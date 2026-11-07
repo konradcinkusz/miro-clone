@@ -35,6 +35,7 @@ public static class ServiceCollectionExtensions
         services.AddAccountRateLimiting(configuration);
         services.TryAddSingleton(TimeProvider.System);
         services.Configure<SessionSettings>(configuration.GetSection(SessionSettings.SectionName));
+        services.AddSingleton(DemoLoginHint.From(configuration, environment));
 
         AddSessionAuthentication(services, configuration, environment);
         AddDataProtection(services, configuration, environment);

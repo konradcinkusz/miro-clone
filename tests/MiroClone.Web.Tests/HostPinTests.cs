@@ -109,4 +109,18 @@ public sealed class HostPinTests
 
         return directory?.FullName ?? throw new InvalidOperationException("MiroClone.sln was not found above the test output.");
     }
+
+    [Fact]
+    public void EveryAccountFormIsGatedUntilTheCircuitIsInteractive()
+    {
+        // The interactive render replaces the prerendered form (ADR 0042), so what was typed before it is lost. Each form's controls sit in
+        // InteractiveFieldset, which is disabled while prerendered (ADR 0051).
+        var pages = Directory.GetFiles(Path.Combine(Root, "MiroClone.Web", "Components", "Pages", "Account"), "*.razor");
+        foreach (var page in pages.Select(File.ReadAllText).Where(text => text.Contains("<form", StringComparison.Ordinal)))
+        {
+            var forms = System.Text.RegularExpressions.Regex.Count(page, "<form ");
+            var gated = System.Text.RegularExpressions.Regex.Count(page, @"<form [^>]*>\s*<InteractiveFieldset>");
+            Assert.Equal(forms, gated);
+        }
+    }
 }

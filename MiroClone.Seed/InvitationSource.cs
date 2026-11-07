@@ -10,6 +10,7 @@ namespace MiroClone.Seed;
 /// </summary>
 internal interface IInvitationSource
 {
+    /// <summary>The newest token the outbox has printed, or null when there is none (or no way to read it).</summary>
     Task<string?> NewestAsync(CancellationToken cancellationToken);
 }
 

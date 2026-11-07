@@ -8,7 +8,7 @@ namespace MiroClone.Web.Auth;
 /// Server-side client for authservice's HTTP surface (identity-and-accounts; ADR 0002). Browsers never call it: account
 /// forms post to the BFF endpoints, which call this client. Failure messages come from authservice's own response bodies.
 /// </summary>
-public sealed class AuthorityClient(HttpClient http)
+public sealed partial class AuthorityClient(HttpClient http, ILogger<AuthorityClient>? logger = null)
 {
     /// <summary>Shown when authservice answers with a body this app cannot read.</summary>
     public const string UnreadableReply = "The sign-in service did not answer as expected. Try again.";
@@ -177,6 +177,9 @@ public sealed class AuthorityClient(HttpClient http)
         return reply.Succeeded ? AuthorityResult.Success(true) : reply.Failure<bool>();
     }
 
+    [LoggerMessage(Level = LogLevel.Warning, Message = "authservice call {Method} {Path} failed: {ExceptionType}: {Reason}")]
+    private static partial void LogCallFailed(ILogger logger, string method, string path, string exceptionType, string reason);
+
     /// <summary>
     /// Sends one call. A call made for a session names it on the request; <see cref="BearerTokenHandler"/> adds the token, so
     /// no caller holds one. A call without a session (sign-in, refresh) carries no bearer.
@@ -202,6 +205,12 @@ public sealed class AuthorityClient(HttpClient http)
         catch (Exception exception) when (exception is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             // An account form must answer with a message, not an exception: the endpoints redirect with an error (ADR 0022).
+            // The cause is logged (type and message only: no token, body or header), so an outage is not a silent message.
+            if (logger is not null)
+            {
+                LogCallFailed(logger, method.Method, path, exception.GetType().Name, exception.Message);
+            }
+
             return AuthorityReply.Unavailable;
         }
 

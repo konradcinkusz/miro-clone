@@ -41,6 +41,8 @@ public sealed class AccountPageTests : IDisposable
 
     private IRenderedComponent<SignIn> Visit(string query)
     {
+        _context.Services.AddSingleton(new MiroClone.Web.Account.DemoLoginHint(false));
+        _context.SetRendererInfo(new RendererInfo("Server", true));
         var navigation = _context.Services.GetRequiredService<NavigationManager>();
         navigation.NavigateTo("http://localhost/sign-in?" + query);
         return _context.Render<SignIn>();

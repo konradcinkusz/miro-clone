@@ -78,6 +78,16 @@ public sealed partial class ComposeParityTests
     }
 
     [Fact]
+    public void ComposeGivesTheWebAppTheSeedSwitchTheSeedReads()
+    {
+        var web = ComposeEnvironment("web");
+        var seed = ComposeEnvironment("seed");
+
+        Assert.Equal(seed["Seed__Enabled"], web["Seed__Enabled"]);
+        Assert.Equal("Development", web["ASPNETCORE_ENVIRONMENT"]);
+    }
+
+    [Fact]
     public void ComposeStartsTheWebAppOnlyAfterTheSeedFinishedAndTheSeedAfterTheThreeServicesAreHealthy()
     {
         var seed = string.Join('\n', ComposeService("seed"));

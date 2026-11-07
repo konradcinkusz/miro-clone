@@ -17,6 +17,7 @@
     else
     {
         <form method="post" action="/account/sign-up" class="stack" data-testid="sign-up-form">
+            <InteractiveFieldset>
             <AntiforgeryToken />
             <div class="field">
                 <label for="sign-up-email">Email</label>
@@ -36,6 +37,7 @@
                 <label for="sign-up-privacy">I accept the Privacy Policy (version @versions.Privacy).</label>
             </div>
             <button class="btn btn-primary" type="submit" data-testid="sign-up-submit">Create account</button>
+            </InteractiveFieldset>
         </form>
     }
 

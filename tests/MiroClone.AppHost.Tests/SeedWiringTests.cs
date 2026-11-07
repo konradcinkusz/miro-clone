@@ -85,4 +85,23 @@ public sealed class SeedWiringTests
             Assert.DoesNotContain("seed", WaitsFor(resource));
         }
     }
+
+    [Theory]
+    [InlineData("Development", null, "true")]
+    [InlineData("Development", "false", "false")]
+    [InlineData("Production", null, "false")]
+    public async Task TheWebAppIsToldWhetherSeedingIsOnSoItCanShowTheDemoLogins(string environment, string? seedEnabled, string expected)
+    {
+        var args = seedEnabled is null ? new[] { $"--environment={environment}" } : [$"--environment={environment}", $"--Seed:Enabled={seedEnabled}"];
+        var web = Assert.Single(Build(args).Resources.OfType<ProjectResource>(), project => project.Name == "web");
+        var executionContext = new DistributedApplicationExecutionContext(
+            new DistributedApplicationExecutionContextOptions(DistributedApplicationOperation.Run));
+        var context = new EnvironmentCallbackContext(executionContext, resource: web);
+        foreach (var callback in web.Annotations.OfType<EnvironmentCallbackAnnotation>())
+        {
+            await callback.Callback(context);
+        }
+
+        Assert.Equal(expected, context.EnvironmentVariables["Seed__Enabled"]);
+    }
 }

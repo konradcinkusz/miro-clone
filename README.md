@@ -64,15 +64,20 @@ No secret has to be created: the authservice signing key is generated for you an
 
 **Demo logins (seeded on every start, both paths):** the seed runs once the services are healthy and is safe to repeat.
 
-| Who | Email | Password |
-|---|---|---|
-| Owner | `owner@dev.test` | `Dev-Password-123!` |
-| Member | `member@dev.test` | `Dev-Password-123!` |
+| Who | Email | Password | Role | Organization |
+|---|---|---|---|---|
+| Owner | `owner@dev.test` | `Dev-Password-123!` | Owner | `Dev Workspace` |
+| Admin | `admin@dev.test` | `Dev-Password-123!` | Admin | `Dev Workspace` |
+| Member | `member@dev.test` | `Dev-Password-123!` | Member | `Dev Workspace` |
+| Other | `other@dev.test` | `Dev-Password-123!` | Owner | `Other Workspace` |
 
-Both belong to the `Dev Workspace` organization and see the boards `Demo: Welcome`, `Demo: Sprint planning` and `Demo: Empty board`. Sign in as one
-in one browser and as the other in a second browser to watch a board live. These are development-only values, not secrets
-(`gitleaks:allow`); the seed runs only in Development. Switch it off with `-- --Seed:Enabled=false` (AppHost) or `SEED_ENABLED=false` (compose);
-re-run or reset it with `scripts/seed-dev-users.sh [--reset]`; check it with `scripts/verify-seed.sh`. Details: [docs/AUTH.md](docs/AUTH.md), [ADR 0050](docs/decisions/0050-the-estate-seeds-demo-data-through-its-public-apis.md).
+The first three see `Demo: Welcome`, `Demo: Sprint planning` and `Demo: Empty board`. Sign in as two of them in two browsers to watch a board live;
+Owner and Admin see "Invite members", Member does not. `other@dev.test` sees only `Demo: Other workspace board`: the Dev Workspace users get "Board not
+found" for it and the other way round (try it by pasting a board's address into the other browser). A user belongs to one organization only.
+The sign-in page lists these logins in a development-only box with a one-click fill, shown only in Development with seeding on. These are development-only
+values, not secrets (`gitleaks:allow`); the seed runs only in Development. Switch it off with `-- --Seed:Enabled=false` (AppHost) or `SEED_ENABLED=false`
+(compose), which also hides the box; re-run or reset it with `scripts/seed-dev-users.sh [--reset]`; check it with `scripts/verify-seed.sh`.
+Details: [docs/AUTH.md](docs/AUTH.md), [ADR 0050](docs/decisions/0050-the-estate-seeds-demo-data-through-its-public-apis.md), [ADR 0051](docs/decisions/0051-the-seed-cast-the-sign-in-hint-and-the-gated-account-forms.md).
 
 **Path 1, the Aspire AppHost (developer path), one command:**
 
