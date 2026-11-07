@@ -319,6 +319,8 @@ jobs:
           docker logs --tail 150 miroclone-authservice-apphost 2>&1 || true
           echo '--- apphost.log: errors, warnings and timeouts (web, boards, canvas), without the Aspire housekeeping ---'
           grep -i -E "fail|error|exception|timeout|timed out|warn" apphost.log | grep -v -E "DefaultHttpClientFactory|V2NamespaceLifecycleWatcher|libgssapi" | tail -n 80 || true
+          echo '--- web, boards and canvas process output captured by Aspire (DCP), last 120 lines each ---'
+          find /tmp -maxdepth 4 -type f -path '*aspire*' \( -name '*web*' -o -name '*boards*' -o -name '*canvas*' \) 2>/dev/null | head -n 12 | while read -r f; do echo "== $f"; tail -n 120 "$f"; done || true
           tail -n 200 apphost.log || true
 
       - name: Stop the AppHost
